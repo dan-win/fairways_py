@@ -280,7 +280,7 @@ def fake_trackers(ctx):
         # '00038826-1cce-11e9-a7b6-0cc47a172970',
         # '0000b7a4-1cce-11e9-899e-0cc47a172970'
 
-        '0186dc66-2179-11e9-85d1-0cc47a172970'
+        # '0186dc66-2179-11e9-85d1-0cc47a172970'
 
     ]
 
@@ -317,7 +317,10 @@ def decode_trackers(ctx):
     """
 
     def extract_cid(text, gaTrackerId):
-        pairs = dict(_.map(text.split("|"), lambda p: p.split("_cid::")))
+        delimiter = "_cid::"
+        if text.find(delimiter) < 0:
+            return "NOT_FOUND"
+        pairs = dict(_.map(text.split("|"), lambda p: p.split(delimiter)))
         # log.debug("PAIRS::: {}".format(pairs))
         return pairs.get(gaTrackerId, "ERROR")
 
@@ -331,7 +334,10 @@ def decode_trackers(ctx):
     for item in trackers:
         envelope = item["envelope"]
         headers = item["headers_info"]
+        sandbox_mode = "use_test_counter" in envelope
         gaTrackerId = "UA-125243419-1"
+        if sandbox_mode:
+            gaTrackerId = "UA-125243419-1"
         # cookies = item["cookies"]
         metadata = {
             "transactionId":    envelope["transactionId"], # <- from FrontEnd!!!
@@ -347,6 +353,8 @@ def decode_trackers(ctx):
             "pageTitle":        envelope["pageTitle"],
             "originResourcePath": envelope["originPage"],
             "userAgent":        headers["user-agent"],
+            "traceMode":         "trace_message" in envelope and not sandbox_mode,
+            "sandboxMode":          sandbox_mode,
         } 
         decoded.append(metadata)
     transactions_string = ",".join(["\"{}\"".format(t["transactionId"]) for t in decoded])
@@ -433,6 +441,8 @@ def annotate_operations(ctx):
                 "originResourcePath",
                 "userAgent",
                 "cookies",
+                "traceMode", 
+                "sandboxMode",
             ).value
         
         return incoming
@@ -449,7 +459,10 @@ def annotate_operations(ctx):
                 ).pick(
                     "operationId", "transactionType"
                 ).value,
-            _.find_where(pushed_transactions, {"transactionId": transactionId}) or find_incoming_transaction(operations, pushed_transactions, transactionId),
+            _.find_where(
+                    pushed_transactions, 
+                    {"transactionId": transactionId}
+                ) or find_incoming_transaction(operations, pushed_transactions, transactionId),
         )
     )
 
@@ -488,8 +501,8 @@ def annotate_transactions(ctx):
             product_id as productId,
             created as timeStamp,
             updated,
-            amount as amount,
-            status as status,
+            amount,
+            status,
             remote_id,
             shop_f1 as tvzPlf,
             foreign_amount as foreignAmount,
@@ -531,7 +544,7 @@ def annotate_transactions(ctx):
                 "currency",
                 ).value,
         )
-    ).saveto(json_stream('./transactions.json')).value
+    ).value
 
     # log.debug('Grouped 2 ===================> \n{}\n'.format(grouped))
 
@@ -624,11 +637,30 @@ def explore_transactions(ctx):
         "tvzavradmin",
     ]
 
+    def filter_unresolved(t):
+        """
+        Sometimes transaction record has no "status" attribute. Why? 
+        Looks like no record with such transactionId in "transactions" db table (?)
+        Log such transactionsa, filter them from further processing.
+        Field "status" comes from billing DB
+        """
+        is_resolved = "status" in t
+        if is_resolved:
+            return True
+        log.error("Incomlete transaction record: {}".format(t))
+        return False
+
     for operationId, rec in operations.items():
         # Filter only successfull:
-        transactions = _.chain(rec["transactions"]).filter(lambda t: t["status"] in ACK and not t["paymentSystemId"] in banned_systems).value
+        transactions = _.chain(rec["transactions"]).filter(
+            filter_unresolved
+        ).filter(
+            lambda t: \
+                t["status"] in ACK and t["sandboxMode"] or not t["paymentSystemId"] in banned_systems
+        ).value
         # find final:
-        terminal = _.filter(transactions, lambda t: t["productId"] and product_cell.search(t["productId"]) is not None)
+        terminal = _.filter(
+            transactions, lambda t: t["productId"] and product_cell.search(t["productId"]) is not None)
         
         sources = _.chain(transactions).filter(
             lambda t: \
@@ -713,6 +745,8 @@ def explore_transactions(ctx):
             "timeStamp",
             # "amount",
             "currency",
+            "traceMode",
+            "sandboxMode",
         ))
         notifications.append(notification)
         # _.extend(operations[operationId], {
@@ -862,12 +896,6 @@ def encode_ga_ecomm_event(ctx):
             continue
 
 
-        subjectId = 0
-        subjectName = "subjectName"
-        extCat = "extCat"
-        ea = "ea" # VOD.toUpperCase() + '-' + category
-
-
         tariffId = t.get("tariffId", "id")
         tariffName = t.get("tariffName") or t.get("paymentSystemId")
         tariffVod = t.get("tariffVod", "vod?")
@@ -919,7 +947,8 @@ def encode_ga_ecomm_event(ctx):
             "pr1ps": "1",
             "ea":   ea,
             "el":   amount,
-            "ec":   "buy"
+            "ec":   "buy",
+            "__trace_mode__": t["traceMode"]
         }
 
         messages.append(ga_event_data)
@@ -943,18 +972,20 @@ def send_ga_ecomm_event(ctx):
 
         resp = requests.post(ga_endpoint, text_buff, headers=headers)
         if resp.status_code >= 400:
-             log.error("GA error: {}; {}".format(resp.status_code, resp.text))
+            log.error("GA error: {}; {}".format(resp.status_code, resp.text))
 
     # trackers = heap.pull("decode_trackers")
     if not ctx:
         return None
         
     messages = ctx["messages"]
+    notifications = ctx["notifications"]
     ga_endpoint = 'https://www.google-analytics.com/batch'
     data_size = 0
     raw_notificaitons = []
     payload = []
     chunks_count = 0
+
     for cnt, ga_event_data in enumerate(messages):
         chunk_no = cnt // 20
         if chunk_no > chunks_count:
@@ -964,6 +995,14 @@ def send_ga_ecomm_event(ctx):
             log.debug("Chunk dumped (due to count > 20): {}".format(chunks_count))
 
         # raw_notificaitons.append(ga_event_data)
+
+        trace_mode = ga_event_data.pop("__trace_mode__")
+
+        if trace_mode:
+            msg = "===> trace notification: {}".format(ga_event_data)
+            log.info(msg)
+            # Ignore test data, output only to log:
+            continue
 
         row = urllib.parse.urlencode(ga_event_data)
         row_size = len(row) + 1 # Take \n into account
