@@ -714,7 +714,7 @@ def explore_transactions(ctx):
                 wallet = True
 
         if len(transactions) == 0:
-            log.debug("Refused transactions??? -> {}".format(rec["transactions"]))
+            log.info("Refused transactions??? -> {}".format(rec["transactions"]))
             continue
         
         result_amount = amount or deposit_amount
@@ -953,6 +953,9 @@ def encode_ga_ecomm_event(ctx):
 
         messages.append(ga_event_data)
     
+    if messages:
+        log.info("Notifications ready: {}".format(messages))
+
     return {
         "messages": messages,
         # "operations": operations,
