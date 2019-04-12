@@ -1,5 +1,8 @@
+# -*- coding: utf-8 -*-
 import os, re, pickle, json, logging, redis, pymysql
 from sqlalchemy import create_engine
+
+from .underscore import Underscore as _
 
 TRACE_MODE = os.getenv('DEBUG_TRACE', False)
 
@@ -14,22 +17,22 @@ logging.basicConfig(
 log = logging.getLogger(__name__)    
 
 def dumpjson(fpath, data):
-    with open(fpath, 'wb') as f:
-        f.write(json.dumps(data, ensure_ascii=False, default=json_serial).encode('utf8'))
+    with open(fpath, 'w') as f:
+        f.write(json.dumps(data, ensure_ascii=False, default=json_serial))
 
 def loadjson(fpath):
-    with open(fpath, 'rb') as f:
+    with open(fpath, 'r') as f:
         s = f.read()
         return json.loads(s.decode('utf-8'))
 
 def json_stream(fpath):
     def wrapper(data):
-        with open(fpath, 'wb') as f:
-            f.write(json.dumps(data, ensure_ascii=False, default=json_serial).encode('utf8'))
+        with open(fpath, 'w') as f:
+            f.write(json.dumps(data, ensure_ascii=False, default=json_serial))
     return wrapper
 
 def dumpxhtml(fpath, data):
-    with open(fpath, 'wb') as f:
+    with open(fpath, 'w') as f:
         f.write(data.encode('utf8'))
 
 
@@ -64,13 +67,13 @@ class JsonStore(DataStore):
     FILEEXT = "json"
 
     def _writedata(self, fpath, data):
-        with open(fpath, 'wb') as f:
-            f.write(json.dumps(data, ensure_ascii=False, default=json_serial).encode('utf8'))
+        with open(fpath, 'w') as f:
+            f.write(json.dumps(data, ensure_ascii=False, default=json_serial))
 
     def _readdata(self, fpath):
-        with open(fpath, 'rb') as f:
+        with open(fpath, 'r') as f:
             s = f.read()
-        return json.loads(s.decode('utf-8'))
+        return json.loads(s)
 
     def snapshot(self, fname):
         """
@@ -78,8 +81,8 @@ class JsonStore(DataStore):
         """
         fpath = self._fmt_path(datakey)
         def wrapper(data):
-            with open(fpath, 'wb') as f:
-                f.write(json.dumps(data, ensure_ascii=False).encode('utf8'))
+            with open(fpath, 'w') as f:
+                f.write(json.dumps(data, ensure_ascii=False))
         return wrapper
 
 
@@ -215,3 +218,32 @@ def json_serial(obj):
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError ("Type %s not serializable" % type(obj))
+
+
+from enum import Enum
+
+class DbTaskSet(Enum):
+
+    def __init__(self, sql, db_env_conf, driver):
+        # self.task_id = 'TASK_ID_DB_FETCH_' + self.name.upper()
+        self.sql = sql
+        self.db_env_conf=db_env_conf
+        self.driver = driver
+    
+    def get_records(self, **sql_params):
+
+        def smart_quote(v):
+            if isinstance(v, str):
+                return "\"{}\"".format(v)
+            return str(v)
+            
+        # Convert lists to comma-delimited enumeration:
+        for key, value in sql_params.items():
+            if isinstance(value, (list, tuple)):
+                sql_params[key] = ",".join(_.map(value, smart_quote))
+
+        db = ConnectionPool.select(MySql, self.db_env_conf)
+        sql = self.sql.format(**sql_params)
+        print("SQL: ", sql)
+        return db.get_records(sql)
+

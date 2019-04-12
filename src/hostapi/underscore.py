@@ -1,8 +1,4 @@
-# from underscore import (
-#     underscore as legacy_underscore, 
-#     _ as legacy_
-# )
-
+# -*- coding: utf-8 -*-
 _methods = (
     'contains',
     'count_by', 
