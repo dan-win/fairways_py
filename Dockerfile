@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
         gcc \
     && rm -rf /var/lib/apt/lists/* 
 
-COPY requirements.txt ./
+COPY src/requirements.txt ./
 # ENV CFLAGS=-I/usr/include/libffi/include
 RUN export CFLAGS=$(pkg-config --cflags libffi) \
     && export LDFLAGS=$(pkg-config --libs libffi) \

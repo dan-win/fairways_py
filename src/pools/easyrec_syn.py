@@ -7,7 +7,7 @@ import os, sys
 import logging
 logging.basicConfig(
     # filename='example.log', 
-    format='%(asctime)s %(levelname)s:%(message)s', 
+    format='easyrec_syn: %(asctime)s %(levelname)s:%(message)s', 
     level=logging.DEBUG)
 log = logging.getLogger(__name__)
 

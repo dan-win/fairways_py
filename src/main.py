@@ -28,7 +28,7 @@ LOG_LEVEL = {
 
 logging.basicConfig(
     # filename='example.log', 
-    format='%(asctime)s %(levelname)s:%(message)s', 
+    format='core: %(asctime)s %(levelname)s:%(message)s', 
     level=LOG_LEVEL)
 log = logging.getLogger(__name__)
 
@@ -36,6 +36,8 @@ import pkgutil, importlib
 
 # import pools.gaecomm as gaecomm
 import pools
+
+known_modules = []
 
 package=pools
 for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
@@ -46,6 +48,7 @@ for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
 
     else:
         print("print module name", modname)
+        known_modules.append(modname.split(".")[-1])
 
 
     print(">>>>>>>>", modname)
@@ -61,7 +64,7 @@ if __name__ == "__main__":
     import json
     from hostapi.io import json_stream
 
-    if len(sys.argv) > 3:
+    if len(sys.argv) > 1:
 
         if sys.argv[1] == '--pool' and sys.argv[3] == '--task' and len(sys.argv) > 3:
             poolname = sys.argv[2]
@@ -80,8 +83,11 @@ if __name__ == "__main__":
 
         elif sys.argv[1] == '--fake' and len(sys.argv) == 2:
             print("Test mode...")
-
-            test_run().then(            
+            poolname = "gaecomm"
+            taskname = "test"
+            pool = getattr(pools, poolname)
+            method = getattr(pool, taskname)
+            method().then(            
                 json_stream('./result100.json')
             )
 
@@ -91,10 +97,31 @@ if __name__ == "__main__":
     else:
         import schedule
         import time
+        sched_logger = logging.getLogger('schedule')
+        sched_logger.setLevel(logging.ERROR)
+        tasks = []
+        for poolname in known_modules:
+            method_name = "run"
+            pool = getattr(pools, poolname)
+            main_method = getattr(pool, method_name, None)
+            if callable(main_method):
+                log.debug("runner: scheduling task sequence: {}.{}".format(poolname, "run"))
+                tasks.append((main_method, poolname, method_name))
+
         def job():
-            run()
+            for (main_method, poolname, method_name) in tasks:
+                try:
+                    main_method(None)
+                except Exception as e:
+                    log.error("Runtime error in {}.{}: {!r}".format(poolname, method_name, e))
+            
+            # poolname = "gaecomm"
+            # taskname = "run"
+            # pool = getattr(pools, poolname)
+            # method = getattr(pool, taskname)
+            # method()
         
-        schedule.every(30).seconds.do(job)
+        schedule.every(60).seconds.do(job)
 
         # Run forst iteration immediately
         job()

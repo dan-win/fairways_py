@@ -164,7 +164,7 @@ class ConnectionPool:
         if not connection:
             connection = driver_cls(env_varname)
             cls._pool[env_varname] = connection
-        log.debug("Pool connections: {}".format(cls._pool))
+        # log.debug("Pool connections: {}".format(cls._pool))
         return connection
 
 
@@ -185,7 +185,8 @@ class MySql:
                                  password=password,                             
                                  db=database,
                                  charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor)
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
         # print()
     
     def get_records(self,sql):
@@ -244,6 +245,6 @@ class DbTaskSet(Enum):
 
         db = ConnectionPool.select(MySql, self.db_env_conf)
         sql = self.sql.format(**sql_params)
-        print("SQL: ", sql)
+        # print("SQL: ", sql)
         return db.get_records(sql)
 

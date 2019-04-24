@@ -4,7 +4,7 @@ import os, sys
 import logging
 logging.basicConfig(
     # filename='example.log', 
-    format='%(asctime)s %(levelname)s:%(message)s', 
+    format='gaecomm: %(asctime)s %(levelname)s:%(message)s', 
     level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
@@ -22,6 +22,8 @@ from hostapi.chains import Chain
 from hostapi.underscore import Underscore as _
 
 buffer_path = os.getenv('EVENTMACHINE_BUFFER', './../buffer')
+SANDBOX_MODE = os.getenv('SANDBOX_MODE', False)
+
 # engine = BinStore(buffer_path)
 engine = NullStore()
 heap = Heap(engine)
@@ -51,14 +53,207 @@ DEPOSIT_ACK = 20
 # All acknowledgements
 ACK = (WITHDRAWAL_ACK, OVERDRAFT_ACK, DEPOSIT_ACK)
 
-"""
-    route: String,
-    sender:   String,
-    headers_info: HashMap<String,Vec<String>>,
-    cookies:   HashMap<String,String>,
-    envelope:   HashMap<String,String>,
+PLF_GROUP = {
+   "3cr": "Telecom",
+   "abt": "STB",
+   "adr": "Mobile",
+   "am1": "Web",
+   "and": "Mobile",
+   "apl": "Mobile",
+   "aze": "Web",
+   "azr": "Web",
+   "bta": "Telecom",
+   "bti": "Telecom",
+   "bts": "Telecom",
+   "btt": "Telecom",
+   "ctv": "Telecom",
+   "dtv": "Telecom",
+   "dun": "STB",
+   "egr": "Web",
+   "elx": "Telecom",
+   "fm1": "Web",
+   "fo3": "Web",
+   "fxm": "SmartTV",
+   "g11": "Web",
+   "gn4": "Web",
+   "gn5": "Web",
+   "gn6": "Web",
+   "gn7": "Web",
+   "gn8": "Web",
+   "gn9": "Web",
+   "gtv": "Web",
+   "hcs": "SmartTV",
+   "htm": "Web",
+   "imp": "Telecom",
+   "ios": "Mobile",
+   "itv": "Telecom",
+   "kar": "Web",
+   "kat": "Telecom",
+   "kbr": "ExternalSite",
+   "kcl": "Telecom",
+   "kpr": "Web",
+   "ksr": "ExternalSite",
+   "ler": "SmartTV",
+   "let": "SmartTV",
+   "lgn": "SmartTV",
+   "lgs": "SmartTV",
+   "liv": "Web",
+   "mag": "STB",
+   "med": "Web",
+   "mir": "Web",
+   "mo4": "Web",
+   "mrt": "Web",
+   "mva": "Mobile",
+   "mvi": "Mobile",
+   "mvl": "Telecom",
+   "nth": "SmartTV",
+   "ntr": "SmartTV",
+   "nu1": "Web",
+   "nur": "Web",
+   "ot1": "Web",
+   "otm": "Web",
+   "phl": "SmartTV",
+   "phn": "SmartTV",
+   "pnc": "SmartTV",
+   "pns": "SmartTV",
+   "psk": "Telecom",
+   "rca": "Mobile",
+   "rcf": "Web",
+   "rch": "Web",
+   "rci": "Mobile",
+   "rcl": "SmartTV",
+   "rcp": "SmartTV",
+   "rcs": "SmartTV",
+   "rcw": "Web",
+   "rcx": "SmartTV",
+   "rcy": "SmartTV",
+   "rmb": "STB",
+   "rst": "Web",
+   "s11": "Web",
+   "s12": "Web",
+   "s13": "Web",
+   "s14": "Web",
+   "s15": "Web",
+   "s16": "Web",
+   "s17": "Web",
+   "s18": "Web",
+   "s19": "Web",
+   "s20": "Web",
+   "s21": "Web",
+   "s22": "Web",
+   "s23": "Web",
+   "s24": "Web",
+   "s25": "Web",
+   "s26": "Web",
+   "s27": "Web",
+   "s28": "Web",
+   "s29": "Web",
+   "s30": "Web",
+   "sce": "SmartTV",
+   "scr": "SmartTV",
+   "si1": "Web",
+   "smg": "SmartTV",
+   "smp": "SmartTV",
+   "spu": "Web",
+   "sra": "SmartTV",
+   "st1": "Web",
+   "st2": "Web",
+   "st3": "Web",
+   "sta": "SmartTV",
+   "stb": "STB",
+   "std": "SmartTV",
+   "stv": "SmartTV",
+   "svp": "Web",
+   "tas": "Web",
+   "tdm": "Telecom",
+   "tel": "Web",
+   "tlk": "Telecom",
+   "tll": "Telecom",
+   "tlt": "Telecom",
+   "tnt": "Telecom",
+   "tsh": "SmartTV",
+   "ttc": "Telecom",
+   "tva": "SmartTV",
+   "tvz": "Web",
+   "tza": "Mobile",
+   "tzf": "Web",
+   "tzi": "Mobile",
+   "u12": "Web",
+   "ukz": "Web",
+   "uzb": "Web",
+   "uzp": "Web",
+   "vid": "Web",
+   "vl4": "Web",
+   "vl5": "Web",
+   "vl6": "Web",
+   "vls": "Web",
+   "vlu": "Web",
+   "xmi": "SmartTV",
+   "zea": "SmartTV"
+}
 
-"""
+ATTR_TEMPLATES = {
+    "Web": {
+        "TMPL_TITLE": "{pageTitle}",
+        "TMPL_HOST": "tvzavr.ru",
+        "TMPL_URI": "{originResourcePath}"
+    },
+    "SmartTV": {
+        "TMPL_TITLE": "{pageTitle}",
+        "TMPL_HOST": "{tvzPlf}/{tvzStvPlfName}.com",
+        "TMPL_URI": "/video/description/{clipSeoAlias}"
+    },
+}
+
+
+# From repo: <our gitlab>/smart-tv/smarttv-main/blob/big_dialog_merge/js/platform.js
+# Host rule: window.platform.plfCode+'/'+window.platform.plf + '.com'
+SMARTTV_UA_MAPPING = (
+    # regex - plf - ignore - ignore - plfName
+    ("SmartHub",   "smp", "samsung", "Samsung", "Orsay"       ), #  Samsung на нативной платформе
+    ("Tizen",      "smp", "tizen",   "Samsung", "Tizen"       ), #  Samsung с операционной системой Tizen
+    ("SimpleSmart", "lgn", "lg",      "LG",      "SimpleSmart" ), #  LG платформа потокового вещания
+    ("Web0S|WebOS", "lgn", "lg",      "LG",      "WebOS"       ), #  LG на платформе WebOS
+    ("NetCast",    "lgn", "lg",      "LG",      "NetCast"     ), #  LG на платформе netCast
+    ("LGSmartTV",  "lgn", "lg",      "LG",      "LGLegacy"    ), #  LG на нативной платформе
+    ("DTVNetBrowser|Espial|Toshiba", "tsh", "desktop", None,      "Toshiba"     ), # Toshiba
+    ("NETTV|Philips", "phn", "desktop", None,      "Philips"     ), #  Philips
+    ("Sony|Bravia", "sce", "sony",    "Sony",    "Sony"        ), #  Sony
+    ("Viera",      "pnc", "desktop", None,      "Panasonic"   ), #  Panasonic
+    ("hisense",    "hcs", "desktop", None,      "Hisense"     ), #  Телевизор компании hisense
+    ("spiderMan",  "tzf", "desktop", None,      "TVZavr"      ), #  FlashPlayer
+    ("infomir",    "mag", "desktop", "Mag",     "MagTV"       ), #  Приставка mag250
+    ("fxm",        "fxm", "desktop", None,      "Foxxum"      ), #  SmartTV от платформы FXM
+    ("netrange",   "ntr", "desktop", None,      "Netrange"    ), #  SmartTV от платформы netrange
+    ("PCBrowser",  "std", "desktop", None,      "Unknown"     ), #  Неизвестная платформа
+)
+
+
+def detect_smarttv_ua(ua_name):
+    """
+    # Test
+    >>> detect_smarttv_ua("Mozilla/5.0 (SmartHub; SMART-TV; U; Linux/SmartTV) AppleWebKit/531.2+ (KHTML, like Gecko) WebBrowser/1.0 SmartTV Safari/531.2+")
+    ('smp', 'Orsay')
+    >>> detect_smarttv_ua("Mozilla/5.0 (Linux; Tizen 2.2; SAMSUNG SM-Z9005) AppleWebKit/537.3 (KHTML, like Gecko) Version/2.2 like Android 4.1; Mobile Safari/537.3")
+    ('smp', 'Tizen')
+    >>> detect_smarttv_ua("Mozilla/5.0 (Unknown; Linux armv7l) AppleWebKit/537.1+ (KHTML, like Gecko)Safari/537.1+ LG Browser/6.00.00(+mouse+3D+SCREEN+TUNER; LGE; model_name; 00.00.00;0x00000001; LCD_SS1A); LG SimpleSmart.TV-2016 /00.00.00 (LG, model_name, wired)")
+    ('lgn', 'SimpleSmart')
+    >>> detect_smarttv_ua("Mozilla/5.0 (DirectFB; U; Linux 35230; en) AppleWebKit/531.2+ (KHTML, like Gecko) Safari/531.2+ LG Browser/4.1.4(+3D+SCREEN+TUNER; LGE; 42LW5700-SA; 04.02.28; 0x00000001;); LG NetCast.TV-2011")
+    ('lgn', 'NetCast')
+    >>> detect_smarttv_ua("Mozilla/5.0 (LuneOS, like webOS/3.0.5; Tablet) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.9.2 Chrome/56.0.2924.103 Safari/537.36")
+    ('lgn', 'WebOS')
+    >>> detect_smarttv_ua("Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.2.1 Chr0me/38.0.2125.122 Safari/537.36 LG Browser/8.00.00(LGE; STB-5500-UA; 07.05.11; 1; DTV_H16A); webOS.TV-2016; LG NetCast.TV-2013 Compatible (LGE, STB-5500-UA, wireless)")
+    ('lgn', 'WebOS')
+    >>> detect_smarttv_ua("Opera/9.80 (Linux armv7l; HbbTV/1.2.1 (; Philips; 40HFL5010T12; ; PHILIPSTV; CE-HTML/1.0 NETTV/4.4.1 SmartTvA/3.0.0 Firmware/004.002.036.135 (PhilipsTV, 3.1.1,)en) ) Presto/2.12.407 Version/12.50")
+    ('phn', 'Philips')
+    >>> detect_smarttv_ua("Mozilla/5.0 (Linux; U; Linux; ja-jp; DTV; TSBNetTV/T3E01CD.0203.DDD) AppleWebKit/536(KHTML, like Gecko) NX/3.0 (DTV; HTML; R1.0;) DTVNetBrowser/2.2 (000039;T3E01CD;0203;DDD) InettvBrowser/2.2 (000039;T3E01CD;0203;DDD)")
+    ('tsh', 'Toshiba')
+    """
+    for (pattern, plf, _1, _2, plf_name) in SMARTTV_UA_MAPPING:
+        if re.search(pattern, ua_name, flags=re.IGNORECASE) is not None:
+            return (plf, plf_name)
+    return (None, None)
+
 
 # class TrackerMap:
 #     def __init__(self, **raw_data):
@@ -103,6 +298,9 @@ def fake_trackers(ctx):
         "0071c064-5ace-11e9-84b2-002590ea2218", # 7, single
         "006103be-56a0-11e9-b335-002590ea2218", # 3, 8
         "003b2362-52a7-11e9-88a4-002590ea4448", # 3, 8
+        # Smart -tv:
+        "7bc0b56a-6512-11e9-942c-0cc47a172970",
+        "9e5a6aee-6512-11e9-a9c1-0cc47a172970",
     ]
 
     trackers = [
@@ -121,7 +319,7 @@ def fake_trackers(ctx):
                 "cids": "UA-97389153-4_cid::1662994990.1554284714|UA-125243419-1_cid::1662994990.1554284714|UA-132525321-1_cid::1662994990.1554284714",
             },
             "headers_info": {
-                "user-agent": "<userAgent>",
+                "user-agent": "Mozilla/5.0 (Linux; Tizen 2.2; SAMSUNG SM-Z9005) AppleWebKit/537.3 (KHTML, like Gecko) Version/2.2 like Android 4.1; Mobile Safari/537.3",
             },
             "cookies": {},
 
@@ -140,6 +338,8 @@ def decode_trackers(ctx):
     def extract_cid(text, gaTrackerId):
         delimiter = "_cid::"
         if text.find(delimiter) < 0:
+            if len(text) > 0:
+                return text # text contains CID value
             return "NOT_FOUND"
         pairs = dict(_.map(text.split("|"), lambda p: p.split(delimiter)))
         # log.debug("PAIRS::: {}".format(pairs))
@@ -157,7 +357,8 @@ def decode_trackers(ctx):
     for item in trackers:
         envelope = item["envelope"]
         headers = item["headers_info"]
-        sandbox_mode = "use_test_counter" in envelope
+        
+        sandbox_mode = SANDBOX_MODE or "use_test_counter" in envelope
         gaTrackerId = "UA-125243419-1"
         if sandbox_mode:
             gaTrackerId = "UA-125243419-1"
@@ -170,9 +371,9 @@ def decode_trackers(ctx):
             # "gaClientId":       envelope["gaClientId"], # <- from FrontEnd
             "gaClientId":       extract_cid(envelope["cids"], gaTrackerId), # <- from FrontEnd
             # "tvzCustomerId":    envelope["tvzCustomerId"], # <- from DB
-            "pageTitle":        envelope["pageTitle"],
-            "originResourcePath": envelope["originPage"],
-            "userAgent":        headers["user-agent"],
+            "pageTitle":        envelope.get("pageTitle"),
+            "originResourcePath": envelope.get("originPage"),
+            "userAgent":        headers["user-agent"][0],
             "traceMode":         "trace_message" in envelope and not sandbox_mode,
             "sandboxMode":          sandbox_mode,
         } 
@@ -242,6 +443,9 @@ def fetch_db_transaction_operation(ctx):
                         ).value
                 )
         ).value
+    
+    if not transactions_ids:
+        log.error("Unresolved transactions! ->>>  {}".format(ctx))
 
     return {
         "transactions_ids":      transactions_ids,
@@ -258,6 +462,10 @@ def fetch_db_transaction(ctx):
     annotated = ctx
 
     transactions_ids = annotated["transactions_ids"]
+
+    if not transactions_ids:
+        return None
+
     mapped = annotated["mapped"]
 
     # transactions = heap.pull("search_transaction_operation")
@@ -402,6 +610,12 @@ def explore_transactions(ctx):
             return (None, None)
         mg = match.groups()
         return smart_int(mg[0]), smart_int(mg[1])
+    
+    def decode_plf_name():
+        # Resolve plf
+        auto_plf, auto_plf_name = detect_smarttv_ua(headers.get("user-agent"))
+        plf = envelope.get("plf")
+
 
     if not ctx: 
         return None
@@ -593,7 +807,7 @@ def annotate_subject(ctx):
         db = ConnectionPool.select(MySql, 'MYSQL_VK')
         
         sql ="""
-            select id, name, meganame, issue as year, type_id from vk.clip where id in ({})
+            select id, name, meganame, issue as year, type_id, seo_alias from vk.clip where id in ({})
             """.format(ids)
         clip_info = db.get_records(sql)
 
@@ -626,13 +840,16 @@ def annotate_subject(ctx):
             if clipId is None:
                 clipName = None 
                 clipCategory = None
+                clipSeoAlias = None
             else:
                 clipName = get_title(clip)
                 clipCategory = get_category(clip)
+                clipSeoAlias = clip["seo_alias"]
 
             _.extend(ntf, {
                 "clipName": clipName,
-                "clipCategory": clipCategory
+                "clipCategory": clipCategory,
+                "clipSeoAlias": clipSeoAlias,
             })
 
     if tariffsIds:
@@ -673,7 +890,7 @@ def encode_ga_ecomm_event(ctx):
     for t in notifications:
 
         # locationInfo = "" # location.pathname + location.hash + location.search
-        title = "<title>"
+        # title = "<title>"
         amount = t["amount"]
         promo_amount = t["promoAmount"]
         amount -= promo_amount
@@ -681,10 +898,24 @@ def encode_ga_ecomm_event(ctx):
         # Ignore 100% promo
         if amount == 0:
             continue
+        
+        # Detect platform details
+        plf = t["tvzPlf"]
+        plf_group = PLF_GROUP.get(plf, "Web")
+        templates = ATTR_TEMPLATES.get(plf_group)
+        if templates is None:
+            templates = ATTR_TEMPLATES.get("Web")
+
+        if plf_group in ("SmartTV", "STB"):
+            auto_plf, plf_name = detect_smarttv_ua(t["userAgent"])
+            t = _.extend({}, t, {"tvzStvPlfName": plf_name})
+            log.debug("PLF is not web: {},{}".format(auto_plf, plf_name))
+            
+        log.debug("PLF DETECTION READY: {}".format(t))
 
 
         tariffId = t.get("tariffId", "id")
-        tariffName = t.get("tariffName") or t.get("paymentSystemId")
+        tariffName = t.get("tariffName")
         tariffVod = t.get("tariffVod", "vod?")
 
         isSubscription = tariffVod.lower() == "svod"
@@ -703,16 +934,19 @@ def encode_ga_ecomm_event(ctx):
             ea = "Фильм"
         elif t["wallet"] is not None:
             # Кошелек
-            subjectId = tariffId
-            subjectName = tariffName
-            extCat = ""
+            subjectId = 0
+            subjectName = "Пополнение"
+            extCat = "Пополнение"
             ea = "Пополнение"
         else:
-            # "Непойми что"?
+            # "Непойми что" - блин это похоже пополнение?
             subjectId = ""
-            subjectName = ""
-            extCat = ""
+            subjectName = "?"
+            extCat = "?"
             ea = "Invalid data in billing!"
+        
+        if SANDBOX_MODE:
+            subjectName = "[{}] {}".format(t["tvzPlf"], subjectName)
 
         ga_event_data = {
             "v":    1,
@@ -720,9 +954,9 @@ def encode_ga_ecomm_event(ctx):
             "tid":  t["gaTrackerId"],
             "cid":  t["gaClientId"],
             "uid":  t["tvzCustomerId"],
-            "dh":   "tvzavr.ru",
-            "dp":   t["originResourcePath"],
-            "dt":   t["pageTitle"], # From DB????
+            "dh":   templates["TMPL_HOST"].format(**t), # "host", e.f.: tvzavr.ru
+            "dp":   templates["TMPL_URI"].format(**t), # "web page"
+            "dt":   templates["TMPL_TITLE"].format(**t), # From DB????
             "pa":   "purchase",
             "ti":   t["transactionId"],
             "tr":   amount,
@@ -777,7 +1011,7 @@ def send_ga_ecomm_event(ctx):
     chunks_count = 0
 
     for cnt, ga_event_data in enumerate(messages):
-        chunk_no = cnt // 20
+        chunk_no = cnt  #  20
         if chunk_no > chunks_count:
             chunks_count = chunk_no
             post(payload)
@@ -818,12 +1052,12 @@ def send_ga_ecomm_event(ctx):
 connector = fetch_trackers
 test_connector = fake_trackers
 
-def run():
+def run(ctx):
     source = fetch_trackers
     dest = send_ga_ecomm_event
     return run_with(source, dest)
 
-def test():
+def test(ctx):
     source = fake_trackers
     dest = lambda ctx: ctx
     return run_with(source, dest)
@@ -849,3 +1083,7 @@ def run_with(source, dest):
             dest
         )
 
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()

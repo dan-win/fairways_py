@@ -7,7 +7,7 @@ import os, sys
 import logging
 logging.basicConfig(
     # filename='example.log', 
-    format='%(asctime)s %(levelname)s:%(message)s', 
+    format='erec: %(asctime)s %(levelname)s:%(message)s', 
     level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
@@ -43,10 +43,10 @@ class CLIP_TYPES(Enum):
         return '%s' % self.value
 
 CLIP_SELECTED_TYPES = (
-    CLIP_TYPES.Single,
-    CLIP_TYPES.Set,
-    # CLIP_TYPES.SetElement,
-    CLIP_TYPES.Season,
+    CLIP_TYPES.Single.value,
+    CLIP_TYPES.Set.value,
+    # CLIP_TYPES.SetElement.value,
+    CLIP_TYPES.Season.value,
 )
 
 class MARK_TYPES(Enum):
@@ -76,8 +76,23 @@ class MARK_TYPES(Enum):
     def __str__(self):
         return '%s' % self.value
 
+
+MARK_AGE_FROM_6 = 19018
+MARK_AGE_FROM_12 = 18576
+MARK_AGE_FROM_14 = 20380
+MARK_AGE_FROM_16 = 9598
+MARK_AGE_FROM_18 = 37064
+
+MARKS_AGES = (
+    MARK_AGE_FROM_6,
+    MARK_AGE_FROM_12,
+    MARK_AGE_FROM_14,
+    MARK_AGE_FROM_16,
+    MARK_AGE_FROM_18,
+)
+
 db_media = "MYSQL_VK"
-# db_media = "MYSQL_VK"
+db_easyrec = "MYSQL_EASYREC"
 
 class DBA(DbTaskSet):
     # OPERATOR = None # Set to MySqlOperator or whatelse...
@@ -105,9 +120,18 @@ class DBA(DbTaskSet):
     CLIP_TARIFF = (
         """select tariff_id, clip_id, granted_clip_id, expired from vk.clip_tariff where expired=0""", 
         db_media, MySql)
+
+    CLIP_TEST = (
+        """select id, name, meganame, issue, seo_alias, duration, description, type_id from vk.clip where id in ({id__in}) limit 10""", 
+        db_media, MySql)
+    REGION = (
+        """select id, name, description, active, currency_iso, territory_id, country_id from vk.region where active=1""", 
+        db_media, MySql)
+
+    # Cleaned:
     MARK = (
         """select  id, name, mark_type_id, seo_alias from vk.mark where visible=1 and id in ({id__in})""", 
-        db_media, MySql) # Выкинуты мусорные марки
+        db_media, MySql)
     CLIP_MARK = (
         """select clip_id, mark_id, position from vk.clip_mark where clip_id in ({id__in}) order by position """, 
         db_media, MySql)
@@ -115,15 +139,17 @@ class DBA(DbTaskSet):
         """
         select id, name, meganame, issue, seo_alias, type_id from vk.clip 
         where type_id in ({types}) and 
-        visible=1 and id>={id__ge} limit 10
+        visible=1 and id>={id__ge} order by id limit 10
         """, 
         db_media, MySql)
-    CLIP_TEST = (
-        """select id, name, meganame, issue, seo_alias, duration, description, type_id from vk.clip where id in ({id__in}) limit 10""", 
-        db_media, MySql)
-    REGION = (
-        """select id, name, description, active, currency_iso, territory_id, country_id from vk.region where active=1""", 
-        db_media, MySql)
+    SYN_STATE = (
+        """
+        select value from easyrec.tvz_syn_state where attr="last_known_clip_id"
+        """,
+        db_easyrec, MySql)
+
+        
+
 
 @heap.store
 def check_er_catalog_state(ctx):
@@ -188,43 +214,63 @@ def reflect_mark_to_clip(ctx):
     })
 
 def annotate_clip_with_mark(ctx):
-    def select_marks(marks_gr, clip_id, mark_type):
-        marks_for_clip = marks_gr.get(clip_id, {})
+    def select_marks(marks_gr, clip_id, mark_type, pick_field):
+        marks_for_clip = marks_gr.get(clip_id, [])
         return _.chain(marks_for_clip).filter(
             lambda m: \
                 m.get("mark_type_id") == mark_type.value
         ).sort_by(
             lambda m:\
                 m.get("position") or 999
-        ).pluck("mark_id").value
+        ).pluck(pick_field).value
+    
+    def map_age(memo, mark_id):
+        value = {
+            MARK_AGE_FROM_18: 18,
+            MARK_AGE_FROM_16: 16,
+            MARK_AGE_FROM_14: 14,
+            MARK_AGE_FROM_12: 12,
+            MARK_AGE_FROM_6: 6,
+        }[mark_id]        
+        return max(memo, value)
 
 
     clips = list(ctx["clips"])
     marks = list(ctx["marks_lookup"])
     marks_gr = _.group_by(marks, "clip_id")
+    pick_field = "mark_id"
     annotated = _.chain(clips).map(lambda c: \
         _.extend({}, c, {
-            "categoties": select_marks(marks_gr, c["id"], MARK_TYPES.CATEGORIES),
-
-            "genres": select_marks(marks_gr, c["id"], MARK_TYPES.GENRES),
-
-            "moods": select_marks(marks_gr, c["id"], MARK_TYPES.MOOD),
-
-            "tags": select_marks(marks_gr, c["id"], MARK_TYPES.TAGS),
-
-            "actors": select_marks(marks_gr, c["id"], MARK_TYPES.ACTORS),
-
-            "directors": select_marks(marks_gr, c["id"], MARK_TYPES.DIRECTORS),
-
-            "studio": select_marks(marks_gr, c["id"], MARK_TYPES.STUDIO),
-
-            "countries": select_marks(marks_gr, c["id"], MARK_TYPES.COUNTRIES),
-
-            "composers": select_marks(marks_gr, c["id"], MARK_TYPES.COMPOSERS),
-
-            "year_intervals": select_marks(marks_gr, c["id"], MARK_TYPES.YEAR_INTERVALS),
-
-
+            "ages": 
+                _.chain(
+                        marks_gr.get(c["id"], [])
+                    ).pluck(
+                        "mark_id"
+                    ).filter(
+                        lambda id: id in MARKS_AGES
+                    ).reduce(
+                        map_age, 0
+                    ).value,
+            "categories": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.CATEGORIES, pick_field),
+            "genres": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.GENRES, pick_field),
+            "moods": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.MOOD, pick_field),
+            "tags": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.TAGS, pick_field),
+            "actors": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.ACTORS, pick_field),
+            "directors": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.DIRECTORS, pick_field),
+            "studio": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.STUDIO, pick_field),
+            "countries": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.COUNTRIES, pick_field),
+            "composers": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.COMPOSERS, pick_field),
+            "year_intervals": 
+                select_marks(marks_gr, c["id"], MARK_TYPES.YEAR_INTERVALS, pick_field),
         })).value
 
     # print(marks)
