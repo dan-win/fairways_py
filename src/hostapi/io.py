@@ -221,15 +221,19 @@ def json_serial(obj):
     raise TypeError ("Type %s not serializable" % type(obj))
 
 
-from enum import Enum
-
 class DbTaskSet(Enum):
 
-    def __init__(self, sql, db_env_conf, driver):
+    def __init__(self, sql, fakemodel, db_env_conf, driver):
         # self.task_id = 'TASK_ID_DB_FETCH_' + self.name.upper()
         self.sql = sql
+        self.fakemodel = fakemodel
         self.db_env_conf=db_env_conf
         self.driver = driver
+        # Register fake reference
+        cls_name = self.__class__.__name__
+        name = self.name
+        root = _fake_db_registry.get(cls_name, {})
+        root[name] = fakemodel
     
     def get_records(self, **sql_params):
 
@@ -243,8 +247,15 @@ class DbTaskSet(Enum):
             if isinstance(value, (list, tuple)):
                 sql_params[key] = ",".join(_.map(value, smart_quote))
 
-        db = ConnectionPool.select(MySql, self.db_env_conf)
+        db = ConnectionPool.select(self.driver, self.db_env_conf)
         sql = self.sql.format(**sql_params)
         # print("SQL: ", sql)
         return db.get_records(sql)
+    
+    @classmethod
+    def prepare_fake(cls):
+        cls_name = self.__class__.__name__
+        root = _fake_db_registry[cls_name]
+        sorted = _.sort_by()
+
 

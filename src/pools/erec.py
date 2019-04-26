@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 
 import re
 import json
+import csv
 import itertools
 
 import requests
@@ -25,6 +26,8 @@ from hostapi.io import Heap, JsonStore, NullStore, Redis, Alchemy, MySql, Connec
 from hostapi.chains import Chain 
 
 from hostapi.underscore import Underscore as _
+
+
 
 buffer_path = os.getenv('EVENTMACHINE_BUFFER', './../buffer')
 # engine = BinStore(buffer_path)
@@ -92,6 +95,8 @@ MARKS_AGES = (
 )
 
 db_media = "MYSQL_VK"
+db_media = "MYSQL_VK_SECONDARY"
+# db_media_secondary = "MYSQL_VK_SECONDARY"
 db_easyrec = "MYSQL_EASYREC"
 
 class DBA(DbTaskSet):
@@ -104,7 +109,8 @@ class DBA(DbTaskSet):
     """
     LEGAL_TERRITORY_VOD = (
         """select clip_id, AVOD, SVOD, TVOD, EST from vk.clip_legal_territory_vod order by clip_id desc""", 
-        db_media, MySql)
+        db_media, MySql,
+        )
     REGION_DEPENDENCE = (
         """select parent_region_id, child_region_id from vk.region_dependence""", 
         db_media, MySql)
@@ -133,7 +139,7 @@ class DBA(DbTaskSet):
         """select  id, name, mark_type_id, seo_alias from vk.mark where visible=1 and id in ({id__in})""", 
         db_media, MySql)
     CLIP_MARK = (
-        """select clip_id, mark_id, position from vk.clip_mark where clip_id in ({id__in}) order by position """, 
+        """select clip_id, mark_id, position from vk.clip_mark where clip_id in ({id__in}) and not mark_id=674 order by position """, 
         db_media, MySql)
     CLIP = (
         """
@@ -141,44 +147,133 @@ class DBA(DbTaskSet):
         where type_id in ({types}) and 
         visible=1 and id>={id__ge} order by id limit 10
         """, 
+        {"id": fake.random, "name":fake.name, "meganame":fake.name, "issue":fake.year, "seo_alias":fake.name, "type_id":}
         db_media, MySql)
-    SYN_STATE = (
+    
+    CLIP_LAST_ID = (
+        """ 
+        select max(id) as lastId from vk.clip
+        """,
+        db_media, MySql)
+
+
+    SYN_STATE_GET = (
         """
-        select value from easyrec.tvz_syn_state where attr="last_known_clip_id"
+        select 
+            model_name as modelName, 
+            key_name as keyName, 
+            key_type as keyType, 
+            last_known_key as lastKnownKey, 
+            last_updated_key as lastUpdatedKey,
+            active, 
+            changedate 
+        from easyrec.elcamino_sync
+        where model_name = '{modelName}'
         """,
         db_easyrec, MySql)
 
+    SYN_STATE_SET = (
+        """
+        UPDATE easyrec.elcamino_sync SET 
+            last_known_key = '{lastKnownKey}', 
+            last_updated_key = '{lastUpdatedKey}'  
+        WHERE model_name = '{modelName}'
+        """,
+        db_easyrec, MySql)
+    
+    
+#     INSERT_EASYREC_ITEM = (
+#         """
+#         INSERT INTO table (id,Col1,Col2) VALUES (1,1,1),(2,2,3),(3,9,3),(4,10,12)
+# ON DUPLICATE KEY UPDATE Col1=VALUES(Col1),Col2=VALUES(Col2);
+#         """
+#         db_easyrec, MySql)
         
+#     UPDATE_EASYREC_ITEM = (
+#         """
+#         """
+#         db_easyrec, MySql)
+        
+DEFAULTS = {
+    "chunkSize": 1000
+}
 
 
 @heap.store
-def check_er_catalog_state(ctx):
-    pass
+def init_env(ctx):
+    return _.extend({}, DEFAULTS, ctx)
 
-def check_tvz_catalog_state(ctx):
-    result = DBA.CLIP_TEST.get_records(id__in=[54, 100])
-    print(result)
-    return result
+def check_tvz_catalog_length(ctx):
+    result = DBA.CLIP_LAST_ID.get_records(id__in=[54, 100])
+    return {
+        "sourceClipLastId": int(result[0]["lastId"])
+    }
 
 
 # def fetch_origin_clips(ctx):
 #     result = DBA.CLIP.get_records(id__ge=100)
 #     print(result)
 #     return result
+CHUNK__SIZE = 1000
+
+# def start(ctx):
+#     ctx = ctx or {}
+#     default = {
+
+#     }
+
+def fetch_update_status(ctx):
+    """
+    """
+    syn_state = DBA.SYN_STATE_GET.get_records(
+        modelName='item'
+    )
+    def typecast(value, type):
+        if type == "int":
+            return int(value)
+        if type == "bool":
+            return bool(value)
+        return value
+
+    item_syn_state = syn_state[0]
+    key_type = item_syn_state["keyType"]
+    return _.extend({}, ctx, {
+        "updateStatus": {
+            "modelName":    item_syn_state["modelName"], 
+            "keyName":      item_syn_state["keyName"], 
+            "keyType":      key_type, 
+            "lastKnownKey":  typecast(item_syn_state["lastKnownKey"], key_type), 
+            "lastUpdatedKey": typecast(item_syn_state["lastUpdatedKey"], key_type),
+        }
+    })
+
 
 def fetch_origin_clips(ctx):
-    """ CLIP """
-    clips = DBA.CLIP.get_records(
-        id__ge=40000,
-        types=CLIP_SELECTED_TYPES
-    )
-    id__in = _.pluck(clips, "id")
-    result = {
-        "clip_id__in": id__in,
-        "clips": clips,
-    }
-    print(result)
-    return result
+    """ 
+    CLIP 
+    """
+    to_id = ctx["sourceClipLastId"]    
+    from_id = ctx["lastUpdatedKey"]
+    chunk_size = ctx["chunkSize"]
+
+
+    if from_id < to_id:
+        clips = DBA.CLIP.get_records(
+            id__ge=from_id,
+            types=CLIP_SELECTED_TYPES,
+            limit=chunk_size
+        )
+
+        id__in = _.pluck(clips, "id")
+        result = {
+            "clip_id__in": id__in,
+            "clips": clips,
+        }
+
+        print(result)
+        return result
+    else:
+        return None
 
 def fetch_origin_clip_marks(ctx):
     """ CLIP_MARK """
@@ -277,11 +372,65 @@ def annotate_clip_with_mark(ctx):
     # return _.extend({}, ctx, {"marks": marks})
     return annotated
 
-# print (check_tvz_catalog_state())
+# print (check_tvz_catalog_length())
+
+def to_easyrec_item(ctx):
+    #   `id` int(11) NOT NULL AUTO_INCREMENT,
+    #   `tenantId` int(11) NOT NULL,
+    #   `itemid` varchar(250) NOT NULL DEFAULT '',
+    #   `itemtype` varchar(20) NOT NULL DEFAULT '',
+    #   `description` varchar(500) DEFAULT NULL,
+    #   `profileData` text,
+    #   `url` varchar(500) DEFAULT NULL,
+    #   `imageurl` varchar(500) DEFAULT NULL,
+    #   `active` tinyint(1) DEFAULT '1',
+    #   `creationdate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    #   `changedate` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+    if not ctx:
+        return None
+    
+    def encode_name(clip):
+        name = clip["name"] or clip["meganame"]
+        return urllib.parse.quote(name)
+    
+    return _.chain(ctx).map(
+        lambda c: {
+            "id": "",
+            "tenantId": 1,
+            "itemId": c["id"],
+            "itemtype": "ITEM",
+            "description": encode_name(c),
+            "profileData": json.dumps(_.pick(c, "type_id", "ages", "categories", "genres", "moods", "tags", "actors", "directors", "studio", "composers", "year_intervals")),
+            "url": "//www.tvzavr.ru/film/{seo_alias}/".format(**c),
+            "imageurl": "//www.tvzavr.ru/common/tvzstatic/cache/300x450/{id}.jpg".format(**c),
+            "active": 1
+        }
+    ).value
+
+def to_csv(ctx):
+    if not ctx:
+        return None
+
+    with open('mycsvfile.csv','w') as f:
+        fieldnames = ctx[0].keys()
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+        # writer.writeheader()
+        for r in ctx:
+            writer.writerow(r)
+    
+    return ctx
 
 def run_with(source, dest):
     return Chain(
             source
+        ).then(
+            init_env
+        ).merge(
+            check_tvz_catalog_length,
+            fetch_update_status,
+        ).then(
+            lambda r: log.debug(" merged result: {}".format(r)) and r
         ).then(
             fetch_origin_clips
         ).then(
@@ -292,6 +441,10 @@ def run_with(source, dest):
             reflect_mark_to_clip
         ).then(
             annotate_clip_with_mark
+        ).then(
+            to_easyrec_item
+        ).then(
+            to_csv
         # )
         # .then(
         #     annotate_subject
@@ -303,6 +456,7 @@ def run_with(source, dest):
 
 def runall(ctx):
     run_with(
-        {},
+        ctx,
         json_stream('./result10.json')
+        # to_csv
     )
