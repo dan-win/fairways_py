@@ -19,7 +19,7 @@ import itertools
 import requests
 import urllib
 
-from enum import Enum
+from enum import Enum, IntEnum
 
 from hostapi.io import Heap, JsonStore, NullStore, Redis, Alchemy, MySql, ConnectionPool, DbTaskSet, json_stream
 
@@ -27,7 +27,9 @@ from hostapi.chains import Chain
 
 from hostapi.underscore import Underscore as _
 
+from ci import fakedb
 
+FAKE_MODE = True
 
 buffer_path = os.getenv('EVENTMACHINE_BUFFER', './../buffer')
 # engine = BinStore(buffer_path)
@@ -80,6 +82,12 @@ class MARK_TYPES(Enum):
         return '%s' % self.value
 
 
+class EnumEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Enum):
+            return obj.name
+        return json.JSONEncoder.default(self, obj)
+
 MARK_AGE_FROM_6 = 19018
 MARK_AGE_FROM_12 = 18576
 MARK_AGE_FROM_14 = 20380
@@ -99,6 +107,7 @@ db_media = "MYSQL_VK_SECONDARY"
 # db_media_secondary = "MYSQL_VK_SECONDARY"
 db_easyrec = "MYSQL_EASYREC"
 
+@fakedb.fixture(True)
 class DBA(DbTaskSet):
     # OPERATOR = None # Set to MySqlOperator or whatelse...
     """
@@ -107,54 +116,99 @@ class DBA(DbTaskSet):
     and call:
     DBA.CLIP_TEST.get_records(id="54")
     """
-    LEGAL_TERRITORY_VOD = (
-        """select clip_id, AVOD, SVOD, TVOD, EST from vk.clip_legal_territory_vod order by clip_id desc""", 
-        db_media, MySql,
-        )
-    REGION_DEPENDENCE = (
-        """select parent_region_id, child_region_id from vk.region_dependence""", 
-        db_media, MySql)
-    TARIFF_PLATFORM = (
-        """select tariff_id, platform_id from vk.tariff_platform where platform_id in (1)""", 
-        db_media, MySql)
-    TARIFF = (
-        """select id, name, price, currency_iso, duration, vod_system from vk.tariff where active=1 and hidden=0""", 
-        db_media, MySql)
-    TARIFF_REGION = (
-        """select tariff_id, region_id from vk.tariff_region""", 
-        db_media, MySql)
-    CLIP_TARIFF = (
-        """select tariff_id, clip_id, granted_clip_id, expired from vk.clip_tariff where expired=0""", 
-        db_media, MySql)
+    # LEGAL_TERRITORY_VOD = (
+    #     """select clip_id, AVOD, SVOD, TVOD, EST from vk.clip_legal_territory_vod order by clip_id desc""", 
+    #     db_media, 
+    #     MySql,
+    #     )
+    # REGION_DEPENDENCE = (
+    #     """select parent_region_id, child_region_id from vk.region_dependence""", 
+    #     db_media, 
+    #     MySql,
+    #     )
+    # TARIFF_PLATFORM = (
+    #     """select tariff_id, platform_id from vk.tariff_platform where platform_id in (1)""", 
+    #     db_media, 
+    #     MySql,
+    #     )
+    # TARIFF = (
+    #     """select id, name, price, currency_iso, duration, vod_system from vk.tariff where active=1 and hidden=0""", 
+    #     db_media, 
+    #     MySql,
+    #     )
+    # TARIFF_REGION = (
+    #     """select tariff_id, region_id from vk.tariff_region""", 
+    #     db_media, 
+    #     MySql,
+    #     )
+    # CLIP_TARIFF = (
+    #     """select tariff_id, clip_id, granted_clip_id, expired from vk.clip_tariff where expired=0""", 
+    #     db_media, 
+    #     MySql,
+    #     )
 
-    CLIP_TEST = (
-        """select id, name, meganame, issue, seo_alias, duration, description, type_id from vk.clip where id in ({id__in}) limit 10""", 
-        db_media, MySql)
-    REGION = (
-        """select id, name, description, active, currency_iso, territory_id, country_id from vk.region where active=1""", 
-        db_media, MySql)
+    # CLIP_TEST = (
+    #     """select id, name, meganame, issue, seo_alias, duration, description, type_id from vk.clip where id in ({id__in}) limit 10""", 
+    #     db_media, 
+    #     MySql,
+    #     )
+    # REGION = (
+    #     """select id, name, description, active, currency_iso, territory_id, country_id from vk.region where active=1""", 
+    #     db_media, 
+    #     MySql,
+    #     )
 
     # Cleaned:
     MARK = (
         """select  id, name, mark_type_id, seo_alias from vk.mark where visible=1 and id in ({id__in})""", 
-        db_media, MySql)
+        db_media, 
+        MySql,
+        (
+            ("id",          fakedb.AutoIncField), 
+            ("name",        fakedb.NameField), 
+            ("mark_type_id", fakedb.EnumField(MARK_TYPES)), 
+            ("seo_alias",   fakedb.SlugField("{}/")),
+        )
+        )
     CLIP_MARK = (
         """select clip_id, mark_id, position from vk.clip_mark where clip_id in ({id__in}) and not mark_id=674 order by position """, 
-        db_media, MySql)
+        db_media, 
+        MySql,
+        (
+            ("clip_id",     fakedb.FK("CLIP", "id")), 
+            ("mark_id",     fakedb.FK("MARK", "id")), 
+            ("position",    fakedb.EnumField([1,2,3])),         
+        )
+        )
+
     CLIP = (
         """
         select id, name, meganame, issue, seo_alias, type_id from vk.clip 
         where type_id in ({types}) and 
         visible=1 and id>={id__ge} order by id limit 10
         """, 
-        {"id": fake.random, "name":fake.name, "meganame":fake.name, "issue":fake.year, "seo_alias":fake.name, "type_id":}
-        db_media, MySql)
+        db_media, 
+        MySql,
+        (
+            ("id",          fakedb.AutoIncField), 
+            ("name",        fakedb.TemplateField("Film {last_name}")), 
+            ("meganame",    "NULL"), 
+            ("issue",       fakedb.YearField), 
+            ("seo_alias",   fakedb.TemplateField("film/{slug}/")), 
+            ("type_id",     fakedb.EnumField(CLIP_TYPES)),
+        )
+        )
     
     CLIP_LAST_ID = (
         """ 
         select max(id) as lastId from vk.clip
         """,
-        db_media, MySql)
+        db_media, 
+        MySql,
+        (
+            ("lastId", 1),
+        )
+        )
 
 
     SYN_STATE_GET = (
@@ -170,7 +224,18 @@ class DBA(DbTaskSet):
         from easyrec.elcamino_sync
         where model_name = '{modelName}'
         """,
-        db_easyrec, MySql)
+        db_easyrec, 
+        MySql,
+        (
+            ("modelName", "item"),
+            ("keyName", "itemid"),
+            ("keyType", "int"),
+            ("lastKnownKey", 0),
+            ("lastUpdatedKey", 0),
+            ("active", 1),
+            ("changedate", "0000-00-00"),
+        )
+        )
 
     SYN_STATE_SET = (
         """
@@ -179,7 +244,10 @@ class DBA(DbTaskSet):
             last_updated_key = '{lastUpdatedKey}'  
         WHERE model_name = '{modelName}'
         """,
-        db_easyrec, MySql)
+        db_easyrec, 
+        MySql,
+        ()
+        )
     
     
 #     INSERT_EASYREC_ITEM = (
@@ -253,7 +321,7 @@ def fetch_origin_clips(ctx):
     CLIP 
     """
     to_id = ctx["sourceClipLastId"]    
-    from_id = ctx["lastUpdatedKey"]
+    from_id = ctx["updateStatus"]["lastUpdatedKey"]
     chunk_size = ctx["chunkSize"]
 
 
@@ -400,7 +468,10 @@ def to_easyrec_item(ctx):
             "itemId": c["id"],
             "itemtype": "ITEM",
             "description": encode_name(c),
-            "profileData": json.dumps(_.pick(c, "type_id", "ages", "categories", "genres", "moods", "tags", "actors", "directors", "studio", "composers", "year_intervals")),
+            "profileData": json.dumps(
+                    _.pick(c, "type_id", "ages", "categories", "genres", "moods", "tags", "actors", "directors", "studio", "composers", "year_intervals"),
+                    cls=EnumEncoder,
+                ),
             "url": "//www.tvzavr.ru/film/{seo_alias}/".format(**c),
             "imageurl": "//www.tvzavr.ru/common/tvzstatic/cache/300x450/{id}.jpg".format(**c),
             "active": 1
@@ -430,8 +501,8 @@ def run_with(source, dest):
             check_tvz_catalog_length,
             fetch_update_status,
         ).then(
-            lambda r: log.debug(" merged result: {}".format(r)) and r
-        ).then(
+        #     lambda r: log.debug(" merged result: {}".format(r)) and r
+        # ).then(
             fetch_origin_clips
         ).then(
             fetch_origin_clip_marks
