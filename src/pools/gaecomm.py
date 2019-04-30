@@ -196,12 +196,22 @@ ATTR_TEMPLATES = {
     "Web": {
         "TMPL_TITLE": "{pageTitle}",
         "TMPL_HOST": "tvzavr.ru",
-        "TMPL_URI": "{originResourcePath}"
+        "TMPL_URI": {
+            "clip":         "{originResourcePath}",
+            "subscription": "{originResourcePath}",
+            "wallet":       "{originResourcePath}",
+            "unknown":      "{originResourcePath}",
+        }
     },
     "SmartTV": {
         "TMPL_TITLE": "{pageTitle}",
         "TMPL_HOST": "{tvzPlf}/{tvzStvPlfName}.com",
-        "TMPL_URI": "/video/description/{clipSeoAlias}"
+        "TMPL_URI": {
+            "clip":         "/video/description/{clipSeoAlias}",
+            "subscription": "/subscriptions",
+            "wallet":       "/profile/account",
+            "unknown":      "?",
+        }
     },
 }
 
@@ -926,24 +936,28 @@ def encode_ga_ecomm_event(ctx):
             subjectName = tariffName
             extCat = "Подписка"
             ea = "Подписка"
+            operation_kind = "subscription"
         elif t["clipId"]:
             # Фильм
             subjectId = t["clipId"]
             subjectName = t["clipName"]
             extCat = t["clipCategory"]
             ea = "Фильм"
+            operation_kind = "clip"
         elif t["wallet"] is not None:
             # Кошелек
             subjectId = 0
             subjectName = "Пополнение"
             extCat = "Пополнение"
             ea = "Пополнение"
+            operation_kind = "wallet"
         else:
             # "Непойми что" - блин это похоже пополнение?
             subjectId = ""
             subjectName = "?"
             extCat = "?"
             ea = "Invalid data in billing!"
+            operation_kind = "unknown"
         
         if SANDBOX_MODE:
             subjectName = "[{}] {}".format(t["tvzPlf"], subjectName)
@@ -955,7 +969,7 @@ def encode_ga_ecomm_event(ctx):
             "cid":  t["gaClientId"],
             "uid":  t["tvzCustomerId"],
             "dh":   templates["TMPL_HOST"].format(**t), # "host", e.f.: tvzavr.ru
-            "dp":   templates["TMPL_URI"].format(**t), # "web page"
+            "dp":   templates["TMPL_URI"][operation_kind].format(**t), # "web page"
             "dt":   templates["TMPL_TITLE"].format(**t), # From DB????
             "pa":   "purchase",
             "ti":   t["transactionId"],
