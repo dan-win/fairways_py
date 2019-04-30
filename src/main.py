@@ -102,18 +102,41 @@ if __name__ == "__main__":
         tasks = []
         for poolname in known_modules:
             method_name = "run"
+            interval_name = "interval_secs"
             pool = getattr(pools, poolname)
             main_method = getattr(pool, method_name, None)
+            if main_method is None:
+                log.error("Pool {} has no 'run' method!".format(poolname))
+                continue # Bypass invalid pool
+            interval_secs = getattr(pool, interval_name, None)
+            if interval_secs is None:
+                log.error("Pool {} has no 'interval_secs' attribute!".format(poolname))
+                continue # Bypass invalid pool
             if callable(main_method):
                 log.debug("runner: scheduling task sequence: {}.{}".format(poolname, "run"))
-                tasks.append((main_method, poolname, method_name))
+                tasks.append((main_method, poolname, method_name, interval_secs))
 
-        def job():
-            for (main_method, poolname, method_name) in tasks:
+        def job_factory(main_method, poolname, method_name):
+            def job():
                 try:
                     main_method(None)
                 except Exception as e:
                     log.error("Runtime error in {}.{}: {!r}".format(poolname, method_name, e))
+            return job
+
+        for (main_method, poolname, method_name, interval_secs) in tasks:
+            job = job_factory(main_method, poolname, method_name)
+            # Run forst iteration immediately
+            job()
+            # Schedule further executions:
+            schedule.every(interval_secs).seconds.do(job)
+
+        # def job():
+        #     for (main_method, poolname, method_name, interval_secs) in tasks:
+        #         try:
+        #             main_method(None)
+        #         except Exception as e:
+        #             log.error("Runtime error in {}.{}: {!r}".format(poolname, method_name, e))
             
             # poolname = "gaecomm"
             # taskname = "run"
@@ -121,10 +144,10 @@ if __name__ == "__main__":
             # method = getattr(pool, taskname)
             # method()
         
-        schedule.every(60).seconds.do(job)
+        # schedule.every(60).seconds.do(job)
 
         # Run forst iteration immediately
-        job()
+        # job()
         while True:
             schedule.run_pending()
             time.sleep(1)

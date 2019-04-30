@@ -167,14 +167,37 @@ class ConnectionPool:
         # log.debug("Pool connections: {}".format(cls._pool))
         return connection
 
+class DbDriver:
+    def fetch(self, sql):
+        raise NotImplemented
 
-class Redis:
+    def exec(self, sql):
+        raise NotImplemented
+
+    def get_records(self, query_template, **params):
+        """
+        Do not override
+        """
+        query = query_template.format(**params)
+        # log.debug("SQL: {}".format(query))
+        return self.fetch(query)
+
+    def execute(self, query_template, **params):
+        """
+        Do not override
+        """
+        query = query_template.format(**params)
+        # log.debug("SQL: {}".format(query))
+        return self.exec(query)
+
+
+class Redis(DbDriver):
     def __init__(self, env_varname='REDIS_ADDRESS', default='localhost:6379'):
         redis_host, redis_port = os.getenv(env_varname, default).split(":")
         self.engine = redis.StrictRedis(host=redis_host, port=int(redis_port), db=0)
 
 
-class MySql:
+class MySql(DbDriver):
 
     def __init__(self, env_varname='DB_CONN', default='localhost:3306'):
         conn_str = os.getenv(env_varname, default)
@@ -189,20 +212,23 @@ class MySql:
                                  autocommit=True)
         # print()
     
-    def get_records(self,sql):
+    def fetch(self,sql):
         with self.engine.cursor() as cursor:
             cursor.execute(sql)
             return cursor.fetchall()
 
+    def exec(self, sql):
+        with self.engine.cursor() as cursor:
+            return cursor.execute(sql)
 
-class Alchemy:
+class Alchemy(DbDriver):
     def __init__(self, env_varname='DB_CONN', default=None):
         conn_str = os.getenv(env_varname, default)
         self.engine = create_engine(conn_str)
         # user, password, host, database = re.match('mysql://(.*?):(.*?)@(.*?)/(.*)', url).groups()
         # print()
     
-    def get_records(self, sql):
+    def fetch(self, sql):
         with self.engine.connect() as con:
             rs = con.execute(sql)
             for row in rs:
@@ -220,16 +246,28 @@ def json_serial(obj):
         return obj.isoformat()
     raise TypeError ("Type %s not serializable" % type(obj))
 
-
 from enum import Enum
 
 class DbTaskSet(Enum):
 
-    def __init__(self, sql, db_env_conf, driver):
+    def __init__(self, sql, db_env_conf, driver, meta):
+        """Creates new instance of DB task 
+        Note: class is based on Python Enum so
+        __init__ blesses a single member of enumeration
+        (See more about Python Enum class)
+        
+        Arguments:
+            sql {str} -- Script to execute
+            db_env_conf {str} -- Name of environment variable wich holds config
+            driver {DbDriver} -- DbDriver subclass
+            meta {dict} -- Any data to store with the task instance
+        """
         # self.task_id = 'TASK_ID_DB_FETCH_' + self.name.upper()
+        print("DbTaskSet - init instance", self)
         self.sql = sql
         self.db_env_conf=db_env_conf
         self.driver = driver
+        self.meta = meta
     
     def get_records(self, **sql_params):
 
@@ -243,8 +281,30 @@ class DbTaskSet(Enum):
             if isinstance(value, (list, tuple)):
                 sql_params[key] = ",".join(_.map(value, smart_quote))
 
-        db = ConnectionPool.select(MySql, self.db_env_conf)
-        sql = self.sql.format(**sql_params)
-        # print("SQL: ", sql)
-        return db.get_records(sql)
+        db = ConnectionPool.select(self.driver, self.db_env_conf)
+        return db.get_records(self.sql, **sql_params)
+
+    def execute(self, **sql_params):
+
+        def smart_quote(v):
+            if isinstance(v, str):
+                return "\"{}\"".format(v)
+            return str(v)
+            
+        # Convert lists to comma-delimited enumeration:
+        for key, value in sql_params.items():
+            if isinstance(value, (list, tuple)):
+                sql_params[key] = ",".join(_.map(value, smart_quote))
+
+        db = ConnectionPool.select(self.driver, self.db_env_conf)
+        return db.execute(self.sql, **sql_params)
+
+
+
+    @classmethod
+    def prepare_fake(cls):
+        cls_name = self.__class__.__name__
+        root = _fake_db_registry[cls_name]
+        sorted = _.sort_by()
+
 

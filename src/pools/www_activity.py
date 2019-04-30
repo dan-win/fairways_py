@@ -57,6 +57,8 @@ def handle_trackers(ctx):
     for t in trackers:
         log.debug("-> {}".format(t))
 
+# Export scheduled interval
+interval_secs = 60
 
 def run(ctx):
     source = fetch_trackers
