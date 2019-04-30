@@ -29,7 +29,7 @@ from hostapi.underscore import Underscore as _
 
 from ci import fakedb
 
-FAKE_MODE = True
+USE_FAKE_DB = os.getenv('FAKE_DB', False)
 
 buffer_path = os.getenv('EVENTMACHINE_BUFFER', './../buffer')
 # engine = BinStore(buffer_path)
@@ -103,11 +103,11 @@ MARKS_AGES = (
 )
 
 db_media = "MYSQL_VK"
-db_media = "MYSQL_VK_SECONDARY"
+# db_media = "MYSQL_VK_SECONDARY"
 # db_media_secondary = "MYSQL_VK_SECONDARY"
 db_easyrec = "MYSQL_EASYREC"
 
-@fakedb.fixture(True)
+@fakedb.fixture(USE_FAKE_DB)
 class DBA(DbTaskSet):
     # OPERATOR = None # Set to MySqlOperator or whatelse...
     """
@@ -169,7 +169,7 @@ class DBA(DbTaskSet):
             ("mark_type_id", fakedb.EnumField(MARK_TYPES)), 
             ("seo_alias",   fakedb.SlugField("{}/")),
         )
-        )
+    )
     CLIP_MARK = (
         """select clip_id, mark_id, position from vk.clip_mark where clip_id in ({id__in}) and not mark_id=674 order by position """, 
         db_media, 
@@ -179,13 +179,13 @@ class DBA(DbTaskSet):
             ("mark_id",     fakedb.FK("MARK", "id")), 
             ("position",    fakedb.EnumField([1,2,3])),         
         )
-        )
+    )
 
     CLIP = (
         """
         select id, name, meganame, issue, seo_alias, type_id from vk.clip 
         where type_id in ({types}) and 
-        visible=1 and id>={id__ge} order by id limit 10
+        visible=1 and id>={id__ge} order by id limit {limit}
         """, 
         db_media, 
         MySql,
@@ -197,7 +197,7 @@ class DBA(DbTaskSet):
             ("seo_alias",   fakedb.TemplateField("film/{slug}/")), 
             ("type_id",     fakedb.EnumField(CLIP_TYPES)),
         )
-        )
+    )
     
     CLIP_LAST_ID = (
         """ 
@@ -208,7 +208,7 @@ class DBA(DbTaskSet):
         (
             ("lastId", 1),
         )
-        )
+    )
 
 
     SYN_STATE_GET = (
@@ -235,7 +235,7 @@ class DBA(DbTaskSet):
             ("active", 1),
             ("changedate", "0000-00-00"),
         )
-        )
+    )
 
     SYN_STATE_SET = (
         """
@@ -247,8 +247,43 @@ class DBA(DbTaskSet):
         db_easyrec, 
         MySql,
         ()
-        )
+    )
     
+    EASYREC_ITEM_INSERT_MANY = (
+        """
+        INSERT INTO easyrec.item
+            (tenantId, itemid, itemtype, description, profileData, url, imageurl)
+        VALUES
+            {args}
+        ON DUPLICATE KEY UPDATE description=VALUES(description), profileData=VALUES(profileData), url=VALUES(url), imageurl=VALUES(imageurl)            
+        """,
+        db_easyrec, 
+        MySql,
+        ()
+    )
+
+    EASYREC_ITEM_MAPPING_GET = (
+        """
+        select stringId from easyrec.idmapping
+        """,
+        db_easyrec, 
+        MySql,
+        ()
+    )
+
+    EASYREC_ITEM_MAPPING_SET = (
+        """
+        INSERT INTO easyrec.idmapping
+            (stringId)
+        VALUES
+            {args}
+        ON DUPLICATE KEY UPDATE stringId=VALUES(stringId)            
+        """,
+        db_easyrec, 
+        MySql,
+        ()
+    )
+
     
 #     INSERT_EASYREC_ITEM = (
 #         """
@@ -261,10 +296,14 @@ class DBA(DbTaskSet):
 #         """
 #         """
 #         db_easyrec, MySql)
-        
+
+
+# TO-DO: make more concise
+
 DEFAULTS = {
-    "chunkSize": 1000
+    "chunkSize": 100
 }
+TENANT_ID = 2
 
 
 @heap.store
@@ -272,7 +311,7 @@ def init_env(ctx):
     return _.extend({}, DEFAULTS, ctx)
 
 def check_tvz_catalog_length(ctx):
-    result = DBA.CLIP_LAST_ID.get_records(id__in=[54, 100])
+    result = DBA.CLIP_LAST_ID.get_records()
     return {
         "sourceClipLastId": int(result[0]["lastId"])
     }
@@ -282,7 +321,6 @@ def check_tvz_catalog_length(ctx):
 #     result = DBA.CLIP.get_records(id__ge=100)
 #     print(result)
 #     return result
-CHUNK__SIZE = 1000
 
 # def start(ctx):
 #     ctx = ctx or {}
@@ -332,13 +370,14 @@ def fetch_origin_clips(ctx):
             limit=chunk_size
         )
 
-        id__in = _.pluck(clips, "id")
-        result = {
+        id__in = _.chain(clips).pluck("id").map(int).value
+
+        result = _.extend({}, ctx, {
             "clip_id__in": id__in,
             "clips": clips,
-        }
+        })
 
-        print(result)
+        # print(result)
         return result
     else:
         return None
@@ -348,7 +387,7 @@ def fetch_origin_clip_marks(ctx):
     clip_ids = list(ctx["clip_id__in"])
     clip_marks = DBA.CLIP_MARK.get_records(id__in=clip_ids)
     id__in = _.pluck(clip_marks, "mark_id")
-    print(clip_marks)
+    # print(clip_marks)
     return _.extend({}, ctx, {
         "mark_id__in": id__in,
         "clip_marks": clip_marks,
@@ -358,7 +397,7 @@ def fetch_origin_marks(ctx):
     """ MARK """
     mark_id__in = list(ctx["mark_id__in"])
     marks = DBA.MARK.get_records(id__in=mark_id__in)
-    print(marks)
+    # print(marks)
     return _.extend({}, ctx, {
         "marks": marks
     })
@@ -438,7 +477,9 @@ def annotate_clip_with_mark(ctx):
 
     # print(marks)
     # return _.extend({}, ctx, {"marks": marks})
-    return annotated
+    return _.extend({}, ctx, {
+       "annotated": annotated
+    }) 
 
 # print (check_tvz_catalog_length())
 
@@ -457,14 +498,16 @@ def to_easyrec_item(ctx):
     if not ctx:
         return None
     
+    annotated = ctx["annotated"]
+
     def encode_name(clip):
         name = clip["name"] or clip["meganame"]
         return urllib.parse.quote(name)
     
-    return _.chain(ctx).map(
+    easyrec_items = _.chain(annotated).map(
         lambda c: {
             "id": "",
-            "tenantId": 1,
+            "tenantId": TENANT_ID,
             "itemId": c["id"],
             "itemtype": "ITEM",
             "description": encode_name(c),
@@ -477,6 +520,70 @@ def to_easyrec_item(ctx):
             "active": 1
         }
     ).value
+
+    return _.extend({}, ctx, {
+        "easyrec_items": easyrec_items
+    })
+
+def update_easyrec_item(ctx):
+    if ctx is None:
+        return None
+    
+    def smart_quote(v):
+        if isinstance(v, str):
+            return "\"{}\"".format(v)
+        return str(v)
+    
+    data = ctx["easyrec_items"]
+    buff = []
+    for rec in data:
+        # Order is mandatory!:
+        row = "({tenantId}, '{itemId}', '{itemtype}', '{description}', '{profileData}', '{url}', '{imageurl}')".format(**rec)
+        buff.append(row)
+    args = ",".join(buff)
+    num_rows = DBA.EASYREC_ITEM_INSERT_MANY.execute(args=args)
+
+    log.info("easyrec catalog: {} items updated".format(num_rows))
+    # update_args = _.reduce(data, )
+    return _.extend({}, ctx, {
+        "items_updated": num_rows
+    })
+
+def reflect_last_updated(ctx):
+    if ctx is None:
+        return None
+
+    clip_ids = ctx["clip_id__in"]
+    lastUpdatedKey = max(clip_ids)
+    lastKnownKey = ctx["sourceClipLastId"]
+    modelName = "item"
+    DBA.SYN_STATE_SET.execute(
+        lastKnownKey=lastKnownKey, 
+        lastUpdatedKey=lastUpdatedKey, 
+        modelName=modelName)
+    return ctx
+
+def update_easyrec_idmapping(ctx):
+    """
+    idmapping is a table with simple registry of string ids
+    """
+    if ctx is None:
+        return None
+    
+    records = DBA.EASYREC_ITEM_MAPPING_GET.get_records()
+    # Note - values are strings!!!
+    known_ids = _.pluck(records, "stringId")
+    # Convert to strings:
+    updated_ids = _.map(ctx["clip_id__in"], str)
+    ids_to_insert = list(
+        set(updated_ids).difference(set(known_ids))
+    )
+    if ids_to_insert:
+        args = ",".join(_.map(ids_to_insert, "('{}')".format))
+        DBA.EASYREC_ITEM_MAPPING_SET.execute(args=args)
+
+    return ctx
+
 
 def to_csv(ctx):
     if not ctx:
@@ -515,15 +622,23 @@ def run_with(source, dest):
         ).then(
             to_easyrec_item
         ).then(
-            to_csv
+            # to_csv
+            update_easyrec_item
         # )
         # .then(
         #     annotate_subject
-        # ).then(
-        #     encode_ga_ecomm_event
+        ).then(
+            reflect_last_updated
+        ).then(
+            update_easyrec_idmapping
         ).then(
             dest
         )
+
+interval_secs = 60
+
+def run(ctx):
+    run_with(ctx, lambda ctx: ctx)
 
 def runall(ctx):
     run_with(

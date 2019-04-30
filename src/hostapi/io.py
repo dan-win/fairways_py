@@ -168,7 +168,10 @@ class ConnectionPool:
         return connection
 
 class DbDriver:
-    def select(self, query_script):
+    def fetch(self, sql):
+        raise NotImplemented
+
+    def exec(self, sql):
         raise NotImplemented
 
     def get_records(self, query_template, **params):
@@ -176,7 +179,16 @@ class DbDriver:
         Do not override
         """
         query = query_template.format(**params)
-        return self._select(query)
+        # log.debug("SQL: {}".format(query))
+        return self.fetch(query)
+
+    def execute(self, query_template, **params):
+        """
+        Do not override
+        """
+        query = query_template.format(**params)
+        # log.debug("SQL: {}".format(query))
+        return self.exec(query)
 
 
 class Redis(DbDriver):
@@ -200,11 +212,14 @@ class MySql(DbDriver):
                                  autocommit=True)
         # print()
     
-    def select(self,sql):
+    def fetch(self,sql):
         with self.engine.cursor() as cursor:
             cursor.execute(sql)
             return cursor.fetchall()
 
+    def exec(self, sql):
+        with self.engine.cursor() as cursor:
+            return cursor.execute(sql)
 
 class Alchemy(DbDriver):
     def __init__(self, env_varname='DB_CONN', default=None):
@@ -213,7 +228,7 @@ class Alchemy(DbDriver):
         # user, password, host, database = re.match('mysql://(.*?):(.*?)@(.*?)/(.*)', url).groups()
         # print()
     
-    def select(self, sql):
+    def fetch(self, sql):
         with self.engine.connect() as con:
             rs = con.execute(sql)
             for row in rs:
@@ -268,7 +283,24 @@ class DbTaskSet(Enum):
 
         db = ConnectionPool.select(self.driver, self.db_env_conf)
         return db.get_records(self.sql, **sql_params)
-    
+
+    def execute(self, **sql_params):
+
+        def smart_quote(v):
+            if isinstance(v, str):
+                return "\"{}\"".format(v)
+            return str(v)
+            
+        # Convert lists to comma-delimited enumeration:
+        for key, value in sql_params.items():
+            if isinstance(value, (list, tuple)):
+                sql_params[key] = ",".join(_.map(value, smart_quote))
+
+        db = ConnectionPool.select(self.driver, self.db_env_conf)
+        return db.execute(self.sql, **sql_params)
+
+
+
     @classmethod
     def prepare_fake(cls):
         cls_name = self.__class__.__name__

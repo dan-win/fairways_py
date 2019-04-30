@@ -1,17 +1,19 @@
-from faker import Faker
-fake = Faker('en_GB')
-from faker.providers import (date_time, internet)
-fake.add_provider(date_time)
-fake.add_provider(internet)
+fake = None
+
+def init_faker():
+    """
+    Avoid heavy operations when not in fake mode
+    """
+    global fake
+    from faker import Faker
+    fake = Faker('en_GB')
+    from faker.providers import (date_time, internet)
+    fake.add_provider(date_time)
+    fake.add_provider(internet)
 
 import re
 import random
 
-_fake_mode = False
-
-def fake_mode():
-    global _fake_mode
-    _fake_mode = True
 
 from enum import Enum
 
@@ -72,8 +74,6 @@ class fixture:
         Keyword Arguments:
             test_mode {bool} -- Switches fake mode on (default: {False})
         """
-        # self.__doc__ = f.__doc__
-        # self.__name__ = f.__name__
         self.test_mode = test_mode
         print("Decorator __init__", args, kwargs)
 
@@ -82,7 +82,9 @@ class fixture:
         # def wrapper(*args, **kwargs):
         print("__call__", cls)
         test_mode = self.test_mode
+
         if test_mode:
+            init_faker()
             fake_driver = FakeDBDriver(cls)
             for k, v in cls.__dict__.items():
                 print("...Scanning...", k, type(v), issubclass(v.__class__, Enum))

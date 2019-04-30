@@ -1052,6 +1052,10 @@ def send_ga_ecomm_event(ctx):
 connector = fetch_trackers
 test_connector = fake_trackers
 
+# Export scheduled interval
+interval_secs = 60
+
+# Export main runner
 def run(ctx):
     source = fetch_trackers
     dest = send_ga_ecomm_event
