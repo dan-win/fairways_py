@@ -635,7 +635,7 @@ def run_with(source, dest):
             dest
         )
 
-interval_secs = 60
+interval_secs = 600
 
 def run(ctx):
     run_with(ctx, lambda ctx: ctx)

@@ -199,27 +199,60 @@ class Redis(DbDriver):
 
 class MySql(DbDriver):
 
-    def __init__(self, env_varname='DB_CONN', default='localhost:3306'):
-        conn_str = os.getenv(env_varname, default)
+    @property
+    def db_name(self):
+        return self.conn_str.split("/")[-1]
 
-        user, password, host, port, database = re.match('mysql://(.*?):(.*?)@(.*?):(.*?)/(.*)', conn_str).groups()
-        self.engine = pymysql.connect(host=host,
-                                 user=user,
-                                 password=password,                             
-                                 db=database,
-                                 charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor,
-                                 autocommit=True)
+    def _ensure_connection(self):
+        if( not self.engine or not self.engine.open): 
+            log.warn("Restoring DB connection: {}".format(self.db_name))
+            self._connect()
+    
+    def _connect(self):
+        user, password, host, port, database = re.match('mysql://(.*?):(.*?)@(.*?):(.*?)/(.*)', self.conn_str).groups()
+        self.engine = pymysql.connect(
+            host=host,
+            user=user,
+            password=password,                             
+            db=database,
+            charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor,
+            autocommit=True)
+
+
+    def __init__(self, env_varname='DB_CONN', default='localhost:3306'):
+        self.conn_str = os.getenv(env_varname, default)
+        self.engine = None
+
+        self._connect()
+        # user, password, host, port, database = re.match('mysql://(.*?):(.*?)@(.*?):(.*?)/(.*)', self.conn_str).groups()
+        # self.engine = pymysql.connect(host=host,
+        #                          user=user,
+        #                          password=password,                             
+        #                          db=database,
+        #                          charset='utf8mb4',
+        #                          cursorclass=pymysql.cursors.DictCursor,
+        #                          autocommit=True)
         # print()
     
     def fetch(self,sql):
-        with self.engine.cursor() as cursor:
-            cursor.execute(sql)
-            return cursor.fetchall()
+        try:
+            self._ensure_connection()
+            with self.engine.cursor() as cursor:
+                cursor.execute(sql)
+                res = cursor.fetchall()
+            return res
+        except Exception as e:
+            log.error("DB operation error: {} at {}".format(e, self.db_name))
 
     def exec(self, sql):
-        with self.engine.cursor() as cursor:
-            return cursor.execute(sql)
+        try:
+            self._ensure_connection()
+            with self.engine.cursor() as cursor:
+                res = cursor.execute(sql)
+            return res
+        except Exception as e:
+            log.error("DB operation error: {} at {}".format(e, self.db_name))
 
 class Alchemy(DbDriver):
     def __init__(self, env_varname='DB_CONN', default=None):

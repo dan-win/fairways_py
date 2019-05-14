@@ -311,6 +311,13 @@ def fake_trackers(ctx):
         # Smart -tv:
         "7bc0b56a-6512-11e9-942c-0cc47a172970",
         "9e5a6aee-6512-11e9-a9c1-0cc47a172970",
+
+        "001dd578-6c42-11e9-a63b-002590ea2218",
+
+        # Direct purchase from wallet (should be filtered):
+        "00736262-7012-11e9-8ee3-002590ea2218",        
+        "0053b554-6c28-11e9-9b5b-002590ea2218",
+
     ]
 
     trackers = [
@@ -724,8 +731,22 @@ def explore_transactions(ctx):
             if deposit_amount:
                 wallet = True
 
+        # Drop unresolved operations where no transactions with ACK status:
         if len(transactions) == 0:
-            log.info("Refused transactions??? -> {}".format(rec["transactions"]))
+            log.info("Refused transactions??? Dropping -> {}".format(rec["transactions"]))
+            continue
+        
+        # Drop direct purchases from wallet (probably mixed with promo-money)
+        # Use: paymentSystemId, transactionType
+        if _.chain(transactions).filter(
+                lambda t: t["paymentSystemId"] != "tvzpromo"
+            ).size().value == 1 \
+            and \
+            _.chain(transactions).filter(
+                lambda t: t["transactionType"] == WITHDRAWAL and t["paymentSystemId"] == "tvzavrwallet"
+            ).size().value == 1:
+
+            log.info("Purchase from wallet. Dropping operation {} -> {}".format(operationId, transactions))
             continue
         
         result_amount = amount or deposit_amount

@@ -37,14 +37,14 @@ class Underscore(object):
         return list(set(list(iterable)))
 
     @staticmethod
-    def filter(iterable, callable):
+    def filter(iterable, iterfunc):
         if iterable is None: return None
-        return [item for item in iterable if callable(item)]
+        return [item for item in iterable if iterfunc(item)]
     
     @staticmethod
-    def reduce(iterable, callable, memo):
+    def reduce(iterable, iterfunc, memo):
         for item in iterable:
-            memo = callable(memo, item)
+            memo = iterfunc(memo, item)
         return memo
 
     @staticmethod
@@ -71,33 +71,33 @@ class Underscore(object):
         return value in iterable
     
     @staticmethod
-    def count_by(iterable, callable):
+    def count_by(iterable, iterfunc):
         result = {}
         for item in iterable:
-            key = callable(item)
+            key = iterfunc(item)
             result[key] = result.get(key, 0) + 1
         return result
 
     @staticmethod
-    def each(iterable, callable):
+    def each(iterable, iterfunc):
         iterator = iterable
         if isinstance(iterable, dict):
             for key, value in iterable.items():
-                callable(value, key, iterable)
+                iterfunc(value, key, iterable)
         else:
             for i, value in enumerate(iterable):
-                callable(value, i, iterable)
+                iterfunc(value, i, iterable)
 
     @staticmethod
-    def every(iterable, callable):
+    def every(iterable, iterfunc):
         if iterable is None: return None
-        return reduce(iterable, lambda v: bool(callable(v)), true)
+        return reduce(iterable, lambda v: bool(iterfunc(v)), true)
 
     @staticmethod
-    def find(iterable, callable):
+    def find(iterable, iterfunc):
         if iterable is None: return None
         for item in iterable:
-            if callable(item):
+            if iterfunc(item):
                 return item
         return None
 
@@ -117,9 +117,9 @@ class Underscore(object):
         return None
 
     @staticmethod
-    def map(iterable, callable):
+    def map(iterable, iterfunc):
         if iterable is None: return None
-        return [callable(item) for item in iterable]
+        return [iterfunc(item) for item in iterable]
 
     @staticmethod
     def group_by(iterable, iteratee):
@@ -127,7 +127,7 @@ class Underscore(object):
         if isinstance(iteratee, str):
             attrname = iteratee
             method = lambda v: v[attrname]
-        elif callable(iteratee):
+        elif iterfunc(iteratee):
             method = iteratee
         else:
             raise TypeError()
@@ -146,7 +146,7 @@ class Underscore(object):
         if isinstance(iteratee, str):
             attrname = iteratee
             method = lambda v: v[attrname]
-        elif callable(iteratee):
+        elif iterfunc(iteratee):
             method = iteratee
         else:
             raise TypeError()
@@ -164,12 +164,16 @@ class Underscore(object):
         return Underscore.uniq(Underscore.map(iterable, lambda v: v[propname]))
     
     @staticmethod
-    def sort_by(iterable, callable):
-        return sorted(iterable, key=callable)
+    def sort_by(iterable, iterfunc):
+        return sorted(iterable, key=iterfunc)
 
     @staticmethod
     def chain(object):
         return Chain(object)
+    
+    @staticmethod
+    def size(iterable):
+        return len(list(iterable))
 
 
 class Chain(object):
@@ -277,6 +281,17 @@ if __name__ == '__main__':
     print(test)
     print("=============")
 
+    test = _.size([1,2,3])
+
+    print("=============")
+    print(test)
+    print("=============")
+
+    test = _.chain([1,2,3]).size().value
+
+    print("=============")
+    print(test)
+    print("=============")
 
     # print(test)
 
