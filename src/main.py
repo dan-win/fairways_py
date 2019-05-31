@@ -87,8 +87,8 @@ if __name__ == "__main__":
             taskname = "test"
             pool = getattr(pools, poolname)
             method = getattr(pool, taskname)
-            method().then(            
-                json_stream('./result100.json')
+            method({}).then(            
+                json_stream('./test-dump-fake.json')
             )
 
         else:

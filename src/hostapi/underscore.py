@@ -175,6 +175,45 @@ class Underscore(object):
     def size(iterable):
         return len(list(iterable))
 
+    @staticmethod
+    def deep_extend(*args):
+        """
+        Deep copy of each item ("extend" makes swallow copy!)
+        """
+        def clone_obj(item):
+            if isinstance(item, dict):
+                return dict(**item)
+            if isinstance(item, (list, tuple)):
+                return list(item)
+            return None
+
+        def iterator(item, i, iterable):
+            obj = clone_obj(item)
+            if obj is None:
+                iterable[i] = item
+            else:
+                if isinstance(obj, dict):
+                    iterable[i] = deep_extend({}, obj)
+                elif isinstance(obj, (list, tuple)):
+                    Underscore.each(obj, iterator)
+                    iterable[i] = obj
+                else:
+                    raise TypeError("deep_copy cannot handle this type: {}".format(type(obj)))
+            
+        args = list(args)
+        dest = args.pop(0)
+
+        for source in args:
+            if source:
+                for k, v in source.items():
+                    obj = clone_obj(v)
+                    if obj is None:
+                        dest[k] = v
+                    else:
+                        Underscore.each(obj, iterator)
+                        dest[k] = obj
+        return dest
+
 
 class Chain(object):
     def __init__(self, data):
@@ -209,7 +248,6 @@ class Chain(object):
     @property
     def value(self):
         return _align_type(self._data)
-
 
 
 def _align_type(data):

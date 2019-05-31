@@ -15,7 +15,9 @@ import itertools
 import requests
 import urllib
 
-from hostapi.io import Heap, JsonStore, NullStore, Redis, Alchemy, MySql, ConnectionPool, json_stream
+from enum import Enum, IntEnum
+
+from hostapi.io import Heap, JsonStore, NullStore, Redis, Alchemy, MySql, ConnectionPool, DbTaskSet, json_stream
 
 from hostapi.chains import Chain 
 
@@ -23,10 +25,35 @@ from hostapi.underscore import Underscore as _
 
 buffer_path = os.getenv('EVENTMACHINE_BUFFER', './../buffer')
 
+from ci import fakedb
+
+FAKE_DB_MODE = os.getenv('FAKE_DB_MODE', False)
+DB_FIXTURE_DATA = os.getenv("DB_FIXTURE_DATA", "")
+
+# print(
+#     "DEBUG:::::",
+#     "|", 
+#     fakedb.MODES.USE_FAKE, "|",
+#     "FAKE_DB_MODE >>>", 
+#     os.environ["FAKE_DB_MODE"], 
+#     os.getenv("FAKE_DB_MODE"),
+#     "DB_FIXTURE_DATA >>>", 
+#     os.environ["DB_FIXTURE_DATA"], 
+#     os.getenv("DB_FIXTURE_DATA")
+# )
 # Flags for test modes:
 SANDBOX_MODE = os.getenv('SANDBOX_MODE', False)
-LOG_ONLY = False
-DO_NOT_FILTER_PS = False
+LOG_ONLY = os.getenv("MUTE_NOTOFICATIONS", False)
+# True in debug:
+DO_NOT_FILTER_PS = os.getenv("DO_NOT_FILTER_PS", False)
+
+settings = {
+    "FAKE_DB_MODE": FAKE_DB_MODE,
+    "DB_FIXTURE_DATA": len(DB_FIXTURE_DATA) > 0,
+    "SANDBOX_MODE": SANDBOX_MODE,
+    "LOG_ONLY": LOG_ONLY,
+    "DO_NOT_FILTER_PS": DO_NOT_FILTER_PS
+}
 
 # engine = BinStore(buffer_path)
 engine = NullStore()
@@ -44,6 +71,8 @@ WITHDRAWAL = 3
 OVERDRAFT = 7 
 # 8	Зачисление средств на счет
 DEPOSIT = 8 
+
+TRANSACTION_TYPES = (WITHDRAWAL, OVERDRAFT, DEPOSIT)
 
 # """
 # STATUS
@@ -245,9 +274,9 @@ ATTR_TEMPLATES["default"] = ATTR_TEMPLATES["Web"]
 
 # Plf group -> tracker id
 GA_TRACKER_ID = {
-    "Web": "UA-132525321-1",
-    "SmartTV": "UA-130113311-1",
-    "default": "UA-125243419-1" # <-- Test counter
+    "Web":      "UA-132525321-1",
+    "SmartTV":  "UA-130113311-1",
+    "default":  "UA-125243419-1" # <-- Test counter
 }
 
 
@@ -272,6 +301,168 @@ SMARTTV_UA_MAPPING = (
     ("netrange",   "ntr", "desktop", None,      "Netrange"    ), #  SmartTV от платформы netrange
     ("PCBrowser",  "std", "desktop", None,      "Unknown"     ), #  Неизвестная платформа
 )
+
+
+class MyRedisConn(Redis):
+    """
+    Here is implementation which specific to this app (model structure: hash of arrays, we are using only one of them: "evt/gaecomm")
+    """
+    def fetch (self, _ignored):
+        trackers = []
+        # Data exist in multiple chunks, so join them together by enumeration:
+        while True:
+            chunk = self.engine.rpop("evt/gaecom")
+            if chunk is None:
+                break
+            rec = chunk.decode()
+            memdata = json.loads(rec)
+            for event in memdata:
+                trackers.append(event)
+
+        return trackers
+
+
+def env_middleware(handler, arg):
+    pass
+
+
+db_media = "MYSQL_VK"
+db_billing = "MYSQL_BILLING"
+redis_alias = "REDIS_ADDRESS"
+
+
+DB_FIXTURE_DICT = DB_FIXTURE_DATA and json.loads(DB_FIXTURE_DATA) or None
+
+@fakedb.fixture(test_mode=FAKE_DB_MODE, fixture=DB_FIXTURE_DATA)
+class DBA(DbTaskSet):
+
+    EVENTS = (
+        "",
+        redis_alias,
+        MyRedisConn,
+        (
+            ("cookies", {}),
+            ("headers_info", {
+                    "user-agent": ["Mozilla/5.0 (Linux; Tizen 2.2; SAMSUNG SM-Z9005) AppleWebKit/537.3 (KHTML, like Gecko) Version/2.2 like Android 4.1; Mobile Safari/537.3"],
+                }
+            ),
+            ("envelope", fakedb.ChildModel((
+                ("trace_message",    1),
+                # "do_not_filter_ps": 1,
+
+                ("operationId",    fakedb.FK("TRANSACTION_OPERATION", "operationId")),
+
+                ("originPage",       fakedb.SlugField("/film/{}/")),
+                ("pageTitle", "Fake title — tvzavr.ru"),
+                ("cids", "UA-97389153-4_cid::1662994990.1554284714|UA-125243419-1_cid::1662994990.1554284714|UA-132525321-1_cid::1662994990.1554284714"),
+            )))
+        ),
+    )
+
+    TRANSACTION_OPERATION = (
+        # """select  id, name, mark_type_id, seo_alias from vk.mark where visible=1 and id in ({id__in})""", 
+        """
+        select 
+            transaction_id as transactionId, 
+            operation_id as operationId 
+            from billing_dev.transaction_operation
+            where operation_id in ({id__in})
+        """,
+        db_billing, 
+        MySql,
+        (
+            ("operationId",        fakedb.Uuid4Field), 
+            ("transactionId",      fakedb.FK("TRANSACTION", "transactionId")),
+        )
+    )
+
+    TRANSACTION = (
+        """
+        select 
+            id as transactionId,
+            user_id as tvzCustomerId,
+            type as transactionType,
+            shop_id as shopId,
+            ps_id as paymentSystemId,
+            product_id as productId,
+            created as timeStamp,
+            updated,
+            amount,
+            remote_amount as remoteAmount,
+            status,
+            remote_id,
+            shop_f1 as tvzPlf,
+            foreign_amount as foreignAmount,
+            foreign_currency as currency 
+            from billing_dev.transaction 
+            where id in ({id__in})
+        """,
+        db_billing, 
+        MySql,
+        (
+            ("transactionId",       fakedb.Uuid4Field), 
+            ("tvzCustomerId",       fakedb.Uuid4Field), 
+            ("transactionType",     fakedb.EnumField(TRANSACTION_TYPES)),
+
+            ("shopId",              fakedb.ConstField("test-shop")), 
+
+            ("paymentSystemId",     fakedb.EnumField(["tvzpromo", "tvzavrwallet", "FAKE"])),
+            # ("productId",           fakedb.EnumField(["2", "25", "43-23173", "19-17864"])),
+            ("productId",           fakedb.EnumField(["2", "3", "2-1", "3-2"])),
+            ("timeStamp",           "2015-07-07 13:23:22"),
+            ("updated",             "0000-00-00 00:00:00"),
+            ("amount",              fakedb.EnumField([99, 249, 499])),
+            ("remoteAmount",        fakedb.EnumField([1, None])),
+
+            ("status",              fakedb.EnumField(ACK)),
+
+            ("remote_id",           ""),
+            ("tvzPlf",              fakedb.EnumField(["tvz", "smp"])),
+            ("foreignAmount",       ""),
+            ("currency",            "RUB"),
+        )
+    )
+
+    TARIFF = (
+        """
+        select id, name as tariffName, vod_system as tariffVod from vk.tariff where id in ({id__in})
+        """,
+        db_media,
+        MySql,
+        (
+            ("id", fakedb.AutoIncField),
+            ("tariffName", fakedb.TemplateField("Tariff {last_name}")),
+            ("tariffVod", fakedb.EnumField(["avod", "tvod", "svod", "est"])),
+        )
+    )
+
+    CLIP = (
+        """
+        select id, name, meganame, issue as year, type_id, seo_alias from vk.clip where id in ({id__in})
+        """, 
+        db_media, 
+        MySql,
+        (
+            ("id",          fakedb.AutoIncField), 
+            ("name",        fakedb.TemplateField("Film {last_name}")), 
+            ("meganame",    "NULL"), 
+            ("year",        fakedb.YearField), 
+            ("seo_alias",   fakedb.TemplateField("film/{slug}/")), 
+            ("type_id",     fakedb.EnumField([1,2,3,5])),
+        )
+    )
+
+    CLIP_MARK = (
+        """select clip_id, mark_id, position from vk.clip_mark where clip_id in ({id__in}) and not mark_id=674 order by position """, 
+        db_media, 
+        MySql,
+        (
+            ("clip_id",     fakedb.FK("CLIP", "id")), 
+            ("mark_id",     fakedb.EnumField([71, 675, 678])), 
+            ("position",    fakedb.EnumField([1,2,3])),  
+        )
+    )
+
 
 
 def detect_smarttv_ua(ua_name):
@@ -314,25 +505,29 @@ def detect_smarttv_ua(ua_name):
 #         self.transactionId = envelope.get('transactionId')
 #         self.gaTrackerId =  "UA-125243419-1"
 
+
+
+
 @heap.store
 def fetch_trackers(ctx):
     """
     Extract data from remote buffer
     """
 
-    redis_db =  ConnectionPool.select(Redis, "REDIS_ADDRESS") 
+    # redis_db =  ConnectionPool.select(Redis, "REDIS_ADDRESS") 
 
-    trackers = []
-    # Data exist in multiple chunks, so join them together by enumeration:
-    while True:
-        chunk = redis_db.engine.rpop("evt/gaecom")
-        if chunk is None:
-            break
-        rec = chunk.decode()
-        memdata = json.loads(rec)
-        for event in memdata:
-            trackers.append(event)
-
+    # trackers = []
+    # # Data exist in multiple chunks, so join them together by enumeration:
+    # while True:
+    #     chunk = redis_db.engine.rpop("evt/gaecom")
+    #     if chunk is None:
+    #         break
+    #     rec = chunk.decode()
+    #     memdata = json.loads(rec)
+    #     for event in memdata:
+    #         trackers.append(event)
+    trackers = DBA.EVENTS.get_records()
+    print("REDIS:", json.dumps(trackers))
     return trackers
 
 def fake_trackers(ctx):
@@ -344,7 +539,7 @@ def fake_trackers(ctx):
         # "006103be-56a0-11e9-b335-002590ea2218", # 3, 8
         # "003b2362-52a7-11e9-88a4-002590ea4448", # 3, 8
         # # Smart -tv:
-        "7bc0b56a-6512-11e9-942c-0cc47a172970",
+        # "7bc0b56a-6512-11e9-942c-0cc47a172970",
         "9e5a6aee-6512-11e9-a9c1-0cc47a172970",
 
         "001dd578-6c42-11e9-a63b-002590ea2218",
@@ -473,24 +668,26 @@ def fetch_db_transaction_operation(ctx):
     pushed_operations = list(ctx)
     pushed_operations_ids = _.pluck(pushed_operations, "operationId")
 
-    transactions_string = ",".join(["\"{}\"".format(id) for id in pushed_operations_ids])
+    # transactions_string = ",".join(["\"{}\"".format(id) for id in pushed_operations_ids])
 
     # log.debug("fetch_db_transaction_operation INPUT: {}".format(pushed_transactions))
 
     # Get operations as groups of transactions:
 
-    db = ConnectionPool.select(MySql,'MYSQL_BILLING')
+    # db = ConnectionPool.select(MySql,'MYSQL_BILLING')
 
-    sql ="""
-    select 
-        transaction_id as transactionId, 
-        operation_id as operationId, 
-        transaction_type as transactionType
-        from billing_dev.transaction_operation
-        where operation_id in ({})
-    """.format(transactions_string)
+    # sql ="""
+    # select 
+    #     transaction_id as transactionId, 
+    #     operation_id as operationId, 
+    #     transaction_type as transactionType
+    #     from billing_dev.transaction_operation
+    #     where operation_id in ({})
+    # """.format(transactions_string)
 
-    transactions = db.get_records(sql)
+    # transactions = db.get_records(sql)
+
+    transactions = DBA.TRANSACTION_OPERATION.get_records(id__in=pushed_operations_ids)
 
     # log.debug('Operations ===================> \n{}\n'.format(transactions))
 
@@ -504,6 +701,8 @@ def fetch_db_transaction_operation(ctx):
     mapped = \
         _.chain(
                 transactions
+            ).filter(
+                lambda t: t["operationId"] in pushed_operations_ids
             ).map(lambda t: \
                 _.extend({}, t,
                     _.chain(
@@ -511,7 +710,7 @@ def fetch_db_transaction_operation(ctx):
                         ).find_where(
                             {"operationId": t["operationId"]}
                         ).pick(
-                            "gaTrackerId",
+                            # "gaTrackerId",
                             # "gaClientId", # <- from FrontEnd,
                             "gaRawCids",
                             "pageTitle",
@@ -550,31 +749,32 @@ def fetch_db_transaction(ctx):
     # transactions = heap.pull("search_transaction_operation")
     transactions_string = ",".join(["\"{}\"".format(t) for t in transactions_ids])
 
-    db = ConnectionPool.select(MySql,'MYSQL_BILLING')
+    # db = ConnectionPool.select(MySql,'MYSQL_BILLING')
 
-    sql = """select 
-            id as transactionId,
-            user_id as tvzCustomerId,
-            type as transactionType,
-            shop_id as shopId,
-            ps_id as paymentSystemId,
-            product_id as productId,
-            created as timeStamp,
-            updated,
-            amount,
-            remote_amount as remoteAmount,
-            status,
-            remote_id,
-            shop_f1 as tvzPlf,
-            foreign_amount as foreignAmount,
-            foreign_currency as currency 
-            from billing_dev.transaction 
-            where id in ({})""".format(transactions_string)
+    # sql = """select 
+    #         id as transactionId,
+    #         user_id as tvzCustomerId,
+    #         type as transactionType,
+    #         shop_id as shopId,
+    #         ps_id as paymentSystemId,
+    #         product_id as productId,
+    #         created as timeStamp,
+    #         updated,
+    #         amount,
+    #         remote_amount as remoteAmount,
+    #         status,
+    #         remote_id,
+    #         shop_f1 as tvzPlf,
+    #         foreign_amount as foreignAmount,
+    #         foreign_currency as currency 
+    #         from billing_dev.transaction 
+    #         where id in ({})""".format(transactions_string)
     
-    # log.debug('SQL ===================> \n{}\n'.format(sql))
+    # # log.debug('SQL ===================> \n{}\n'.format(sql))
 
     try:
-        records = db.get_records(sql)    
+        # records = db.get_records(sql)
+        records = DBA.TRANSACTION.get_records(id__in=list(transactions_ids))
     except Exception as e:
         log.error("Error in DB call *** '{}'; SQL: {}".format(e, sql))
         raise
@@ -895,19 +1095,25 @@ def annotate_subject(ctx):
         # SINGLE = 1
         # """
 
-        ids = ",".join(["\"{}\"".format(id) for id in clipsIds])
+        # ids = ",".join(["\"{}\"".format(id) for id in clipsIds])
         
-        db = ConnectionPool.select(MySql, 'MYSQL_VK')
+        # db = ConnectionPool.select(MySql, 'MYSQL_VK')
         
-        sql ="""
-            select id, name, meganame, issue as year, type_id, seo_alias from vk.clip where id in ({})
-            """.format(ids)
-        clip_info = db.get_records(sql)
+        # sql ="""
+        #     select id, name, meganame, issue as year, type_id, seo_alias from vk.clip where id in ({})
+        #     """.format(ids)
+        # clip_info = db.get_records(sql)
 
-        sql ="""
-            select clip_id, mark_id from vk.clip_mark where clip_id in ({})
-            """.format(ids)
-        clip_marks = db.get_records(sql)
+        clip_info = DBA.CLIP.get_records(id__in=clipsIds)
+
+        # sql ="""
+        #     select clip_id, mark_id from vk.clip_mark where clip_id in ({})
+        #     """.format(ids)
+        # clip_marks = db.get_records(sql)
+
+
+        clip_marks = DBA.CLIP_MARK.get_records(id__in=clipsIds)
+
 
         def get_title(clip):
             if clip is None:
@@ -947,14 +1153,17 @@ def annotate_subject(ctx):
 
     if tariffsIds:
 
-        ids = ",".join(["\"{}\"".format(id) for id in tariffsIds])
+        # ids = ",".join(["\"{}\"".format(id) for id in tariffsIds])
         
-        db = ConnectionPool.select(MySql, 'MYSQL_VK')
+        # db = ConnectionPool.select(MySql, 'MYSQL_VK')
         
-        sql ="""
-            select id, name as tariffName, vod_system as tariffVod from vk.tariff where id in ({})
-            """.format(ids)
-        tariff_info = db.get_records(sql)
+        # sql ="""
+        #     select id, name as tariffName, vod_system as tariffVod from vk.tariff where id in ({})
+        #     """.format(ids)
+        # tariff_info = db.get_records(sql)
+
+        tariff_info = DBA.TARIFF.get_records(id__in=tariffsIds)
+
         # log.debug('SQL ===================> \n{}\n'.format(sql))
         # log.debug('TARIFFS ===================> \n{}\n'.format(tariff_info))
         for ntf in notifications:
@@ -1171,22 +1380,34 @@ test_connector = fake_trackers
 # Export scheduled interval
 interval_secs = 60
 
+
+# ###############################
+# Legend
+# ###############################
+import pprint
+pp = pprint.PrettyPrinter(indent=4)
+pp.pprint(settings)
+# ###############################
+
+
 # Export main runner
 def run(ctx):
-    pass
-    # source = fetch_trackers
-    # dest = send_ga_ecomm_event
-    # return run_with(source, dest)
+    # pass
+    source = fetch_trackers
+    dest = send_ga_ecomm_event
+    return run_with(source, dest)
 
 def test(ctx):
     import pprint
     
     def dest(ctx):
-        pp = pprint.PrettyPrinter(indent=4)
-        pp.pprint(ctx)
+        # pp = pprint.PrettyPrinter(indent=4)
+        # pp.pprint(ctx)
         return ctx
         
     source = fake_trackers
+    # source = fetch_trackers
+
     return run_with(source, dest)
 
 def run_with(source, dest):

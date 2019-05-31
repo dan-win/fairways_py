@@ -107,7 +107,11 @@ db_media = "MYSQL_VK"
 # db_media_secondary = "MYSQL_VK_SECONDARY"
 db_easyrec = "MYSQL_EASYREC"
 
-@fakedb.fixture(USE_FAKE_DB)
+@fakedb.fixture(
+    test_mode_attr="FAKE_DB_MODE", 
+    fixture_attr="DB_FIXTURE_DATA", 
+    fixture_file=None, 
+)
 class DBA(DbTaskSet):
     # OPERATOR = None # Set to MySqlOperator or whatelse...
     """

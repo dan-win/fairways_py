@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 fake = None
 
 def init_faker():
@@ -7,13 +8,15 @@ def init_faker():
     global fake
     from faker import Faker
     fake = Faker('en_GB')
-    from faker.providers import (date_time, internet)
+    from faker.providers import (date_time, internet, )
     fake.add_provider(date_time)
     fake.add_provider(internet)
 
+import os
 import re
 import random
-
+import uuid
+import json
 
 from enum import Enum
 
@@ -63,27 +66,49 @@ class FakeDBDriver:
         # for _ in range(1, RECORDS_COUNT):
         #     return "scanning task: ", result, type(result)
 
+class MODES:
+    PROD = ""
+    USE_FAKE = "fake"
+    USE_FIXTURE = "fixture"
+
 
 class fixture:
     """
     Decorator with fake data form DbTaskSet
     """
-    def __init__(self, test_mode=False, *args, **kwargs):
+    def __init__(self, 
+            test_mode_attr="FAKE_DB_MODE", 
+            fixture_attr="DB_FIXTURE_DATA", 
+            fixture_file=None, 
+            *args, **kwargs):
+
         """[summary]
         
         Keyword Arguments:
             test_mode {bool} -- Switches fake mode on (default: {False})
         """
-        self.test_mode = test_mode
-        print("Decorator __init__", args, kwargs)
+
+        fx_data_serialized = os.getenv(fixture_attr, None)
+        fixture = None
+        if fx_data_serialized:
+            fixture = json.loads(fx_data_serialized)
+
+
+        self.test_mode = os.getenv(test_mode_attr, MODES.PROD)
+        self.fixture = fixture
+        self.fixture_file = fixture_file
+        print("fixture db __init__", self.test_mode)
 
     
     def __call__(self, cls, *args, **kwargs):
         # def wrapper(*args, **kwargs):
         print("__call__", cls)
         test_mode = self.test_mode
+        fixture = self.fixture
+        fixture_file = self.fixture_file
 
-        if test_mode:
+        if test_mode == MODES.USE_FAKE:
+            print("fixture: USE_FAKE")
             init_faker()
             fake_driver = FakeDBDriver(cls)
             for k, v in cls.__dict__.items():
@@ -100,6 +125,27 @@ class fixture:
                     fake_driver.add_model(model_name, sql_key, meta)
                     v.driver = fake_driver
                     # setattr(cls, k, (sql, env_alias, fake_driver, meta))
+
+        elif test_mode == MODES.USE_FIXTURE:
+            print("fixture: USE_FIXTURE")
+            if fixture_file:
+                with open(fixture_file, 'r') as f:
+                    s = f.read()
+                    fx_data = json.loads(s.decode('utf-8'))
+            elif fixture:
+                fx_data = fixture
+            else:
+                raise TypeError("Neither variable nor file were specified for fixture data!")
+            # Define new class:
+
+            cls_name = "{}Fixture".format(cls.__name__)
+            attrs = {}
+            for name, response in fx_data.items():
+                attrs[name] = DbResponseFixture(response)
+            fx_class = type(cls_name, (object,), attrs)
+            # print("new fixture", fx_class, dir(fx_class))
+            return fx_class
+
 
         return cls
 
@@ -127,7 +173,7 @@ class Model:
         self.meta = meta
         self.data = []
     
-    def build(self, resolve_fk=True):
+    def build(self, resolve_fk=True, rows_count=RECORDS_COUNT):
         parent = None
         if resolve_fk:
             parent = self.parent
@@ -140,14 +186,18 @@ class Model:
                 raise ValueError("Parsing error: {}; at row: '{}'".format(e, row))
             if ffactory is None:
                 ffactory = ConstField(None)
-            if isinstance(ffactory, (str, bool, int, float)):
+            elif isinstance(ffactory, (str, bool, int, float, dict)):
                 local_value = ffactory
                 ffactory = ConstField(local_value)
-            if isclass(ffactory):
+            elif isinstance(ffactory, ChildModel):
+                ffactory = Model(self.parent, "{}.{}".format(self.name, fname), ffactory.meta)
+            elif isclass(ffactory):
                 ffactory = ffactory()
+            # else:
+            #     raise TypeError("Unknown definition type: {!r}".format(ffactory))
             fakers[fname] = ffactory
 
-        for i in range(0, RECORDS_COUNT):
+        for i in range(0, rows_count):
             row = {}
             for rec in self.meta:
                 fname = rec[0]
@@ -155,13 +205,24 @@ class Model:
                 row[fname] = fakers[fname].value(self)
             self.data.append(row)
 
-    def get(self, resolve_fk=True):
+    def get(self, resolve_fk=True, rows_count=RECORDS_COUNT):
         if not self.data:
-            self.build(resolve_fk)
+            self.build(resolve_fk, rows_count)
         return self.data
+    
+    def value(self, parent_model):
+        """
+        Model itself can act as a faker (returns single instance)
+        """
+        return self.get().pop(-1)
     
     def get_adjacent(self, model_name):
         return self.parent.find_by_name(model_name)
+
+class ChildModel:
+    def __init__(self, meta):
+        self.meta = list(meta)
+
 
 class FakeField:
     def __init__(self):
@@ -182,6 +243,10 @@ class AutoIncField:
         self.last_value += 1
         return self.last_value
 
+class Uuid4Field:
+    def value(self, model):
+        return str(uuid.uuid4())
+
 
 # class RegExField:
 #     def __init__(self, regex):
@@ -199,7 +264,7 @@ class TemplateField:
     def __init__(self, template):
         self.template = template
         self.names = re.findall("\{([^\}]*)\}", template)
-        print("NAMES FOUND: ", self.names)
+        # print("NAMES FOUND: ", self.names)
 
     def render(self):
         buff = self.template
@@ -235,15 +300,33 @@ class FK(FakeField):
     """
     Foreign key provider
     """
-    def __init__(self, model_name, field):
+    def __init__(self, model_name, field, one2one=False):
         self.model_name = model_name
         self.field = field
+        self.buff = None
+        self.one2one = one2one
+        self.seen = set()
 
     def value(self, model):
         lookup_model = model.get_adjacent(self.model_name)
         field = self.field
-        values = [r[field] for r in lookup_model.get()]
-        return random.choice(values)
+        if not self.buff:
+            self.buff = [r[field] for r in lookup_model.get()]
+        if self.one2one:
+            value = self.buff.pop(-1)
+            while value in self.seen:
+                try:
+                    value = self.buff.pop(-1)
+                except IndexError:
+                    raise IndexError(
+                        "Possible values of foreign key exhausted: {}:{}, seen values: {}".format(
+                            self.model_name,
+                            self.field,
+                            self.seen
+                        ))
+            self.seen.add(value)
+            return value
+        return random.choice(self.buff)
 
 
 # def fake_model_factory(enum_cls, model):
@@ -253,6 +336,41 @@ class FK(FakeField):
 #     for field, ftype in m.items():
 #         if ftype in ()
 #     buffer = []
+
+
+
+class DbResponseFixture:
+    def __init__(self, response_dict):
+        self.response_dict = response_dict
+
+    def get_records(self, **sql_params):
+        return self.response_dict
+
+# class DbTaskSetFixture:
+
+
+#     def __init__(self, fx_data):
+#         """Creates new instance of DB task with fixture responses (read-only dataset)
+#         Emulates behaviour of io.DBATestkSet
+#         Note: class is based on Python Enum so
+#         __init__ blesses a single member of enumeration
+#         (See more about Python Enum class)
+        
+#         Arguments:
+#             fx_data - dict where values are names of objects and values are responses of related get_records()
+#         """
+#         # self.task_id = 'TASK_ID_DB_FETCH_' + self.name.upper()
+#         print("DbTaskSet - init fixture")
+#         self.registry = {}
+#         for name, response in fx_data.items():
+#             self.registry[name] = DbResponseFixture(response)    
+
+#     def __getattribute__(self, name):
+#         if name in self.registry:
+#             return self.registry[name]
+#         return object.__getattribute__(self, name)
+
+
 
 if __name__ == "__main__":
 

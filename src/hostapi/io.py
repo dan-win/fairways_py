@@ -119,6 +119,7 @@ class NullStore(DataStore):
         pass
 
     def push(self, datakey, data):
+        # print("STEP {}".format(datakey), "RESULT: ", data)
         pass
 
     def pull(self, datakey):
@@ -178,8 +179,9 @@ class DbDriver:
         """
         Do not override
         """
-        query = query_template.format(**params)
-        # log.debug("SQL: {}".format(query))
+        # Convert all iterables to lists to 
+        query = query_template.format(**params).replace('\n', " ").replace("\"", "\'")
+        log.debug("SQL: {}".format(query))
         return self.fetch(query)
 
     def execute(self, query_template, **params):
@@ -308,9 +310,12 @@ class DbTaskSet(Enum):
             if isinstance(v, str):
                 return "\"{}\"".format(v)
             return str(v)
-            
+        
         # Convert lists to comma-delimited enumeration:
         for key, value in sql_params.items():
+            # Convert iterables like set to list:
+            if isinstance(value, (set, map)):
+                value = list(value)
             if isinstance(value, (list, tuple)):
                 sql_params[key] = ",".join(_.map(value, smart_quote))
 
