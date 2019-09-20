@@ -5,7 +5,7 @@ import logging
 
 log = logging.getLogger("app")
 
-SETTINGS_MODULE = os.environ["PYWATERS_SETTINGS_MODULE"]
+SETTINGS_MODULE = os.environ["FAIRWAYS_PY_SETTINGS_MODULE"]
 
 log.debug(f"...Importing settings: {SETTINGS_MODULE}")
 

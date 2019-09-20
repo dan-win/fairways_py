@@ -1,5 +1,5 @@
 INSTALLED_APPS = [
-    "dummy_pool",
+    "examples.dummy_pool",
 ]
 
 # ENTRYPOINTS = "pools.entries"
