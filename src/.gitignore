@@ -1,8 +1,0 @@
-*.json
-upload.cfg
-.env*
-buffer/
-*.pyc
-Dockerfile.0
-*.log
-*.pickle
