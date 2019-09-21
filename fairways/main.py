@@ -44,12 +44,10 @@ POOLS_PACKAGE = ".".join(SETTINGS_MODULE.split('.')[:-1])
 
 import api
 
-from api import dynload
-from api import log
-from api.conf import settings
+# from api.conf import settings
 
-from api.underscore import Underscore as _
-from api.decorators.entrypoint import Channel
+# from api.underscore import Underscore as _
+# from api.decorators.entrypoint import Channel
 
 import logging
 
@@ -58,7 +56,7 @@ log = logging.getLogger(__name__)
 if __name__ == "__main__":
     from api import App
     app = App()
-    app.start(settings)
+    app.start()
 
     # import sys
     # import argparse

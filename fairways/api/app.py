@@ -20,8 +20,11 @@ import logging
 log = logging.getLogger(__name__)
 
 class App:
+
+    def __init__(self):
+        self.settings = settings
     
-    def start(self, settings):
+    def start(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('-p', '--pool', type=str, default=None, help="Run selected pool only (where name of a pool is a module name where pool is defined)")
         parser.add_argument('-d', '--data', type=str, default=None, help="Initial data for a pool in json format (ignored if no --pool specified)")
@@ -59,7 +62,7 @@ class App:
         else:
             # Import all:
             imported_names = []
-            for mod_qname in settings.INSTALLED_APPS:
+            for mod_qname in self.settings.INSTALLED_APPS:
                 dynload.import_module(mod_qname)
                 imported_names += [mod_qname]
 
