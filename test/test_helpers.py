@@ -7,7 +7,7 @@ def setUpModule():
 def tearDownModule():
     pass
 
-class TestRecSysEvent(unittest.TestCase):
+class HeplersTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from fairways import helpers
