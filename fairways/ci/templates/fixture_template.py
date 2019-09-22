@@ -4,6 +4,8 @@ import fairways
 
 from fairways.ci.utils import csv2py
 
+from fairways.funcflow import FuncFlow as ff
+
 def setUpModule():
     pass
 
@@ -31,7 +33,7 @@ class FixtureTestTemplate(unittest.TestCase):
         """
         Test that numbers between 0 and 5 are all even.
         """
-        entry = _.find(Channel.items(), lambda r: r.channel_tag == "qa" and r.module == self.modname)        
+        entry = ff.find(Channel.items(), lambda r: r.channel_tag == "qa" and r.module == self.modname)        
         print("entry:::::", entry)
 
         # entry = self._core.registry.select(self.modname, 'test')
