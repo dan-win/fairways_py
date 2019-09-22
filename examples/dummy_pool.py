@@ -49,9 +49,9 @@ def start(ctx):
 
 def stop(ctx):
     log.info("Dummy -done ")
-    return {}
+    return {"result": "ok"}
 
-@entrypoint.cron(seconds=10)
+@entrypoint.cli()
 def run(ctx):
     log.debug(f"Running @entrypoint.cron...{__name__}")
     return Chain(start).then(stop)

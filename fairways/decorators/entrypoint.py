@@ -24,6 +24,9 @@ class RegistryItem:
         self.channel_tag = attrs["channel_tag"]
         self.module = attrs["module"]
         self.doc = attrs["doc"]
+    
+    def __str__(self):
+        return f"Entrypoint: {self.module}:{self.channel_tag} / function: {self.handler.__name__}"
 
 class Channel:
     """[summary]
