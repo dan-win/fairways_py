@@ -4,7 +4,12 @@ __all__ = [
     "env_vars"
 ]
 
-from api.io.sync import DbTaskSetManager
+import os
+import functools
+
+from fairways.funcflow import FuncFlow as ff
+
+from ..io.sync import DbTaskSetManager
 dba = DbTaskSetManager.inject_dba_decorator
 
 def env(override=True, **env_vector):
@@ -40,7 +45,7 @@ def env_vars(*env_vars):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(context, **kwargs):
-            env_vector = _.pick(os.environ, *env_vars)
+            env_vector = ff.pick(os.environ, *env_vars)
             env = kwargs.get('env', {})
             env.update(env_vector)
             kwargs.update({"env": env})

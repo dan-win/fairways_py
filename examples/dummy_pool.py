@@ -18,21 +18,23 @@ import urllib
 
 from enum import Enum, IntEnum
 
-from api.io.sync import JsonStore, NullStore, Redis, MySql, ConnectionPool, DbTaskSetManager, DbTaskSet, Query, json_stream
+import fairways
 
-from api.decorators import entrypoint, use
+from fairways.io.sync import JsonStore, NullStore, Redis, MySql, ConnectionPool, DbTaskSetManager, DbTaskSet, Query, json_stream
 
-from api.chains import Chain 
+from fairways.decorators import entrypoint, use
 
-from api.underscore import Underscore as _
+from fairways.chains import Chain 
 
-from api.helpers import rows2dict
+from fairways.funcflow import FuncFlow as ff
 
-from ci import (fakedb, utils)
+from fairways.helpers import rows2dict
+
+from fairways.ci import (fakedb, utils)
 
 log = logging.getLogger("cron")
 
-sched_logger = log
+# sched_logger = log
 
 # class AppState:
 #     def __init__(self):

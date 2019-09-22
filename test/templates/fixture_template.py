@@ -1,6 +1,8 @@
 import unittest
 
-from ci.utils import csv2py
+import fairways
+
+from fairways.ci.utils import csv2py
 
 def setUpModule():
     pass
@@ -22,9 +24,6 @@ class FixtureTestTemplate(unittest.TestCase):
         # from pools import recsys as subject_module
         cls.modname = cls.module_to_test.__name__
         import logging
-        from api import (core, triggers)
-        cls.triggers = triggers
-        cls._core = core
         log = logging.getLogger(__name__)
         cls.log = log
 
@@ -32,15 +31,7 @@ class FixtureTestTemplate(unittest.TestCase):
         """
         Test that numbers between 0 and 5 are all even.
         """
-        # for i in range(0, 6):
-        #     with self.subTest(i=i):
-        #         self.assertEqual(i % 2, i % 2)
-        # self.log.debug("REGISTRY: %s", self._core.registry)
-        # entry = self._core.registry.test[self.modname]['method']
-        print("", __name__, self.triggers.enum_triggers())
-        
-        entry = self.triggers.enum_module_triggers(self.modname, tag="test")[0]["method"]
-        
+        entry = _.find(Channel.items(), lambda r: r.channel_tag == "qa" and r.module == self.modname)        
         print("entry:::::", entry)
 
         # entry = self._core.registry.select(self.modname, 'test')

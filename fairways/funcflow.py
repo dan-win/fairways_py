@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-class Underscore(object):
+class FuncFlow(object):
     @staticmethod
     def uniq(iterable):
         if iterable is None: return None
@@ -105,11 +105,11 @@ class Underscore(object):
         
         def grouper(memo, v):
             key = method(v)
-            return Underscore.extend(memo, {
+            return FuncFlow.extend(memo, {
                 key: memo.get(key, []) + [v]
             })
 
-        return Underscore.reduce(iterable, grouper, {})
+        return FuncFlow.reduce(iterable, grouper, {})
 
     @staticmethod
     def index_by(iterable, iteratee):
@@ -124,15 +124,15 @@ class Underscore(object):
         
         def grouper(memo, v):
             key = method(v)
-            return Underscore.extend(memo, {
+            return FuncFlow.extend(memo, {
                 key: v
             })
 
-        return Underscore.reduce(iterable, grouper, {})
+        return FuncFlow.reduce(iterable, grouper, {})
 
     @staticmethod
     def pluck(iterable, propname):
-        return Underscore.uniq(Underscore.map(iterable, lambda v: v[propname]))
+        return FuncFlow.uniq(FuncFlow.map(iterable, lambda v: v[propname]))
     
     @staticmethod
     def sort_by(iterable, iterfunc):
@@ -166,7 +166,7 @@ class Underscore(object):
                 if isinstance(obj, dict):
                     iterable[i] = deep_extend({}, obj)
                 elif isinstance(obj, (list, tuple)):
-                    Underscore.each(obj, iterator)
+                    FuncFlow.each(obj, iterator)
                     iterable[i] = obj
                 else:
                     raise TypeError("deep_copy cannot handle this type: {}".format(type(obj)))
@@ -181,7 +181,7 @@ class Underscore(object):
                     if obj is None:
                         dest[k] = v
                     else:
-                        Underscore.each(obj, iterator)
+                        FuncFlow.each(obj, iterator)
                         dest[k] = obj
         return dest
 
@@ -205,7 +205,7 @@ class Chain(object):
         self._data = data
     
     def _method(self, name):
-        method = getattr(Underscore, name)
+        method = getattr(FuncFlow, name)
         def wrapper(*args, **kwargs):
             data = _align_type(self._data)
             self._data = method(data, *args, **kwargs)
@@ -214,7 +214,7 @@ class Chain(object):
 
     
     def __getattribute__(self, name):
-        if name in dir(Underscore):
+        if name in dir(FuncFlow):
             return self._method(name)
         return object.__getattribute__(self, name)
     
@@ -256,7 +256,7 @@ def _align_type(data):
 
 if __name__ == '__main__':
 
-    _ = Underscore
+    _ = FuncFlow
 
     data = [
         {'id': 11, 'data': 'test1', 'tag': 'a'},

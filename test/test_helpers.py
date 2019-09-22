@@ -10,7 +10,7 @@ def tearDownModule():
 class TestRecSysEvent(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from api import helpers
+        from fairways import helpers
         cls.helpers = helpers
 
     @classmethod

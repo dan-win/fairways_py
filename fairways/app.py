@@ -2,20 +2,22 @@
 import os, sys
 from dotenv import load_dotenv
 
-import api
+import fairways
 
-from api import dynload
-from api import log
-from api.conf import settings
+from . import dynload
+from fairways.log import init as init_log
+from fairways.conf import settings
 
-from api.underscore import Underscore as _
-from api.decorators.entrypoint import Channel
+from fairways.funcflow import FuncFlow as ff
+from fairways.decorators.entrypoint import Channel, RegistryItem
 
 import sys
 import argparse
 import json
 
 import logging
+
+init_log()
 
 log = logging.getLogger(__name__)
 
@@ -47,11 +49,12 @@ class App:
             pool = sys.modules[poolname]
 
             if entrypoint:
-                e = _.filter(Channel.items(), lambda r: r.channel_tag == entrypoint and r.module == poolname)
+                e = ff.find(Channel.items(), lambda r: r.channel_tag == entrypoint and r.module == poolname)
                 # e = triggers.enum_module_triggers(poolname, tag=entrypoint)
                 if e is None:
                     raise KeyError("Module {} has no entypoint with type {}".format(poolname, entrypoint))
-                method = e["method_"]
+                assert isinstance(e, RegistryItem)
+                method = e.handler
             else:
                 method = getattr(pool, taskname, None)
                 if method is None:
@@ -78,9 +81,9 @@ class App:
         """
         entrypoint = args.entrypoint or "cli"
 
-        entrypoints = _.filter(Channel.items(), lambda e: e.channel_tag == entrypoint)
+        entrypoints = ff.filter(Channel.items(), lambda e: e.channel_tag == entrypoint)
 
         log.info(f"Running {len(entrypoints)} triggers")
 
-        for handler in _.map(entrypoints, lambda e: e.handler):
+        for handler in ff.map(entrypoints, lambda e: e.handler):
             handler(ctx)

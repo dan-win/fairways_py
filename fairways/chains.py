@@ -5,7 +5,7 @@ import functools
 
 from inspect import signature
 
-from .underscore import Underscore as _
+from .funcflow import FuncFlow as ff
 from .helpers import (get_nested, get_parent, get_lastkey)
 
 # TO-DO: move to rust with multiprocessing!
@@ -49,11 +49,11 @@ class Chain:
             if callable(item):
                 return item
             raise TypeError("Middleware should be callable: {!r}".format(item))
-        self.middleware_items = _.map(items, check_callable)
+        self.middleware_items = ff.map(items, check_callable)
         return self
     
     def _call_wrapped(self, method, ctx):
-        ctx = _.deep_extend(ctx)
+        ctx = ff.deep_extend(ctx)
         if self.middleware_items:
             for middleware_item in self.middleware_items:
                 ctx = middleware_item(method, ctx, **{"__step": self.step})
@@ -151,6 +151,6 @@ class Chain:
         Returns:
             Any -- Unwrapped value
         """
-        return _.deep_extend(self.ctx)
+        return ff.deep_extend(self.ctx)
 
 

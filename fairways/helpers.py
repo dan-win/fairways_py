@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .underscore import Underscore as _
+from .funcflow import FuncFlow as ff
 
 def get_nested(d, path, delimiter="/"):
     """
@@ -38,7 +38,7 @@ def rows2dict(r, key_attr=None, value_attr=None):
     """
     Convert list of dicts to the mapped dict {key_attr -> value_attr} for specified namets of key and value attributes
     """
-    return _.reduce(r, lambda memo, r: _.extend(memo, {r[key_attr]: r[value_attr]}), {})
+    return ff.reduce(r, lambda memo, r: ff.extend(memo, {r[key_attr]: r[value_attr]}), {})
 
 
 def ColoredFormatterFactory(**kwargs):

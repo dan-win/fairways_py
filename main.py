@@ -42,19 +42,21 @@ POOLS_PACKAGE = ".".join(SETTINGS_MODULE.split('.')[:-1])
 # log = logging.getLogger(__name__)
 
 
-import api
+# from fairways import api
 
 # from api.conf import settings
 
-# from api.underscore import Underscore as _
-# from api.decorators.entrypoint import Channel
+
+import fairways
 
 import logging
 
 log = logging.getLogger(__name__)
 
+
+
 if __name__ == "__main__":
-    from api import App
+    from fairways.app import App
     app = App()
     app.start()
 

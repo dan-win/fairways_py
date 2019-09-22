@@ -2,9 +2,9 @@
 
 import os, re
 import logging
-from logging.config import dictConfig
+import logging.config
 
-from . import conf
+from fairways.conf import settings
 
 DEFAULT_CONF = {
     'version': 1,
@@ -42,7 +42,7 @@ DEFAULT_CONF = {
             "format": "%(log_color)s%(levelname)-8s%(reset)s %(log_color)s%(message)s"
         },
         "color": {
-            "()": "api.helpers.ColoredFormatterFactory",
+            "()": "fairways.helpers.ColoredFormatterFactory",
             "format_template": "%(log_color)s%(levelname)-8s%(reset)s %(log_color)s%(message)s",
             "datefmt": None,
             "reset": True,
@@ -70,13 +70,10 @@ DEFAULT_CONF = {
 }
 
 
-logging_conf = getattr(conf.settings, "LOGGING", DEFAULT_CONF)
+def init():
+    logging_conf = getattr(settings, "LOGGING", DEFAULT_CONF)
+    user_conf = DEFAULT_CONF.copy()
+    user_conf.update(logging_conf)
+    logging.config.dictConfig(user_conf)
 
-_loggers = {}
-
-def init_loggers():
-    conf = DEFAULT_CONF.copy()
-    conf.update(logging_conf)
-    dictConfig(conf)
-
-init_loggers()
+# init_loggers()

@@ -11,7 +11,7 @@ LOGGING = {
         "console": {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
-            'formatter': 'standard'            
+            'formatter': 'color'            
         },
         "rmq": {
 			'level': 'DEBUG',
@@ -40,7 +40,7 @@ LOGGING = {
             "format": "%(levelname)-8s %(asctime)s %(message)s"
         },
         "color": {
-            "()": "api.helpers.ColoredFormatterFactory",
+            "()": "fairways.helpers.ColoredFormatterFactory",
             "format_template": "%(log_color)s%(levelname)-8s%(reset)s %(log_color)s%(message)s",
             "datefmt": None,
             "reset": True,

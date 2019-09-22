@@ -43,7 +43,7 @@ class JsonStore(DataStore):
 
     def snapshot(self, fname):
         """
-        Chainable wrapper for underscore "closure":)
+        Chainable wrapper for FuncFlow "closure":)
         """
         fpath = self._fmt_path(datakey)
         def wrapper(data):

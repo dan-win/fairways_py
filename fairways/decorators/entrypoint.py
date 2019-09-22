@@ -1,7 +1,9 @@
-from api.underscore import Underscore as _
+from ..funcflow import FuncFlow as ff
 
 import logging
 log = logging.getLogger(__name__)
+
+import functools
 
 from enum import Enum
 
@@ -39,7 +41,7 @@ class Channel:
     # def fmt_route(self):
 
     def __init__(self, **options):
-        options = _.pick(options, *(self.decorator_kwargs))
+        options = ff.pick(options, *(self.decorator_kwargs))
         missed = [k for k in self.decorator_required_kwargs if k not in options.keys()]
         if len(missed) > 0:
             raise TypeError("Decorator {} - required args missed: {}".format(self.__class__.__name__, ",".join(missed)))
@@ -52,7 +54,7 @@ class Channel:
     def __call__(self, handler):
         self._registry += [RegistryItem(
             handler=handler,
-            meta=_.extend({}, self.options),
+            meta=ff.extend({}, self.options),
             channel_tag=self.channel_tag,
             module=handler.__module__,
             doc=handler.__doc__,
@@ -64,11 +66,11 @@ class Channel:
     def items(cls):
         if cls.__name__ == Channel.__name__:
             return iter(cls._registry)
-        return _.filter(cls._registry, lambda v: v.channel_tag == cls.channel_tag)
+        return ff.filter(cls._registry, lambda v: v.channel_tag == cls.channel_tag)
 
     @classmethod
     def chain(cls):
-        return _.chain(cls.items())
+        return ff.chain(cls.items())
 
 
 
@@ -109,7 +111,7 @@ class Http(Channel):
         Returns:
             [type] -- [description]
         """
-        return _.map(self.items(), lambda rec: (
+        return ff.map(self.items(), lambda rec: (
             f'/{rec.channel_tag}/{rec.module}.{rec.handler.__name__}',
             rec.handler
         ))
