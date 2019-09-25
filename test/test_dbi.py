@@ -14,12 +14,11 @@ def tearDownModule():
 class DbiTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from fairways.io.sync import (DbTaskSetManager, DbTaskSet, Query, FixtureQuery, DbDriver)
+        from fairways.io.generic.dbi import (DbTaskSetManager, DbTaskSet, Query, FixtureQuery)
         cls.DbTaskSetManager = DbTaskSetManager
         cls.DbTaskSet = DbTaskSet
         cls.Query = Query
         cls.FixtureQuery = FixtureQuery
-        cls.DbDriver = DbDriver
 
     @classmethod
     def tearDownClass(cls):
@@ -31,7 +30,6 @@ class DbiTestCase(unittest.TestCase):
         DbTaskSetManager = self.DbTaskSetManager
         DbTaskSet = self.DbTaskSet
         Query = self.Query
-        DbDriver = self.DbDriver
 
         manager = DbTaskSetManager()
 
@@ -59,7 +57,6 @@ class DbiTestCase(unittest.TestCase):
         DbTaskSetManager = self.DbTaskSetManager
         DbTaskSet = self.DbTaskSet
         Query = self.Query
-        DbDriver = self.DbDriver
         FixtureQuery = self.FixtureQuery
 
         manager = DbTaskSetManager()
@@ -103,7 +100,6 @@ class DbiTestCase(unittest.TestCase):
         DbTaskSetManager = self.DbTaskSetManager
         DbTaskSet = self.DbTaskSet
         Query = self.Query
-        DbDriver = self.DbDriver
         FixtureQuery = self.FixtureQuery
 
         manager = DbTaskSetManager()

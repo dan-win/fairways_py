@@ -4,14 +4,24 @@ import redis
 import os
 import re
 
-from .dbi import DbDriver
+from .base import SynDbDriver
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class Redis(DbDriver):
-    def __init__(self, env_varname='REDIS_ADDRESS', default='localhost:6379'):
+class Redis(SynDbDriver):
+    autoclose = False
+    default_conn_str = 'localhost:6379'
+
+    # def __init__(self, env_varname='REDIS_ADDRESS', default='localhost:6379'):
+    #     redis_host, redis_port = os.getenv(env_varname, default).split(":")
+    #     self.engine = redis.StrictRedis(host=redis_host, port=int(redis_port), db=0)
+
+    def is_connected(self):
+        return self.engine
+    
+    def _connect(self):
         redis_host, redis_port = os.getenv(env_varname, default).split(":")
         self.engine = redis.StrictRedis(host=redis_host, port=int(redis_port), db=0)
 

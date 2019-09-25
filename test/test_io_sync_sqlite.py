@@ -21,17 +21,13 @@ class SqLiteTestCase(unittest.TestCase):
         from fairways.ci import helpers
         cls.helpers = helpers
 
-        from fairways.io.asyn import sqlite
+        from fairways.io.sync import sqlite
 
-        import asyncio
         import time
-        import concurrent.futures
         import re
         import os
-        cls.asyncio = asyncio
         cls.sqlite = sqlite
         cls.time = time
-        cls.futures = concurrent.futures
         cls.re = re
 
         cls.clean_test_db()
@@ -45,7 +41,6 @@ class SqLiteTestCase(unittest.TestCase):
         """
         """
         sqlite = self.sqlite
-        asyncio = self.asyncio
 
         # default=":memory:"
         db_alias = "MY_TEST_SQLITE"
@@ -54,7 +49,7 @@ class SqLiteTestCase(unittest.TestCase):
             db = sqlite.SqLite(db_alias)
 
             sql = "select 99"
-            result = self.helpers.run_asyn(db.fetch(sql))
+            result = db.fetch(sql)
 
         self.assertEqual(result, [{'99': 99}])
 
@@ -70,15 +65,15 @@ class SqLiteTestCase(unittest.TestCase):
 
             sql = """CREATE TABLE fairways (id integer primary key, name varchar);"""
             
-            self.helpers.run_asyn(db.execute(sql))
+            db.execute(sql)
 
             sql = """insert into fairways (id, name) values (1, "My Way");"""
             
-            self.helpers.run_asyn(db.execute(sql))
+            db.execute(sql)
 
             sql = """select name from fairways where id=1;"""
             
-            result = self.helpers.run_asyn(db.fetch(sql))
+            result = db.fetch(sql)
             
         self.assertEqual(result, [{'name': 'My Way'}])
 

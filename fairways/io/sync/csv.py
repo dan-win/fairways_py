@@ -2,17 +2,13 @@
 
 import csv
 
-from .dbi import DbDriver
+from .base import SynDbDriver
 
-class Csv(DbDriver):
+class Csv(SynDbDriver):
 
     @property
     def file_name(self):
         return self.conn_str.split("/")[-1]
-
-    def __init__(self, env_varname='DB_CONN', default=None):
-        self.conn_str = os.getenv(env_varname, default)
-        self.engine = None
     
     def get_records(self, query_template, **params):
         try:
@@ -45,6 +41,6 @@ class Csv(DbDriver):
                 for row in data:
                     writer.writerow({'first_name': 'Baked', 'last_name': 'Beans'})
         except Exception as e:
-            log.error("DB operation error: {} at {}".format(e, self.file_name))
+            log.error("Csv operation error: {} at {}".format(e, self.file_name))
 
 

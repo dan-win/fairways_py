@@ -1,4 +1,4 @@
-from .dbi import *
+from ..generic.dbi import *
 from .csv import *
 from .generic_datastore import *
 from .json import *

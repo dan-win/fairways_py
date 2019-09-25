@@ -12,6 +12,8 @@ import logging
 log = logging.getLogger(__name__)
 
 class SqLite(AsyncDbDriver):
+    default_conn_str = ":memory:"
+    autoclose = True
 
     def is_connected(self):
         return self.engine is not None
@@ -22,17 +24,6 @@ class SqLite(AsyncDbDriver):
         engine.row_factory = dict_factory
         engine.isolation_level = "IMMEDIATE"
         self.engine = engine
-    
-    async def close(self):
-        if self.engine is not None:
-            await self.engine.close()
-            self.engine = None
-
-    def __init__(self, env_varname='DB_CONN', default=":memory:"):
-        self.conn_str = os.getenv(env_varname, default)
-        self.engine = None
-        assert self.conn_str, "SqLite error: you should specify either environment variable or default value for database file name"
-        self.autoclose = True
 
 
 def dict_factory(cursor, row):

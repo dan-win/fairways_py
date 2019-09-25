@@ -12,21 +12,17 @@ except:
 import os
 import re
 
-from .dbi import DbDriver
+from .base import SynDbDriver
 
 import logging
 log = logging.getLogger(__name__)
 
-class PostgreSql(DbDriver):
+class PostgreSql(SynDbDriver):
 
-    @property
-    def db_name(self):
-        return self.conn_str.split("/")[-1]
+    autoclose = False
 
-    def _ensure_connection(self):
-        if self.engine is None or self.engine.closed: 
-            log.warning("Restoring DB connection: {}".format(self.db_name))
-            self._connect()
+    def is_connected(self):
+        return self.engine and not self.engine.closed
     
     def _connect(self):
         user, password, host, port, database = re.match('postgres[^:]*://(.*?):(.*?)@(.*?):(.*?)/(.*)', self.conn_str).groups()
@@ -38,20 +34,6 @@ class PostgreSql(DbDriver):
             charset='utf8mb4',
             # cursorclass=_DictCursor,
             autocommit=True)
-
-    def __init__(self, env_varname='DATABASE_URL', default='localhost:5432'):
-        self.conn_str = os.getenv(env_varname, default)
-        self.engine = None
-        self._connect()
-    
-    def __del__(self):
-        if self:
-            self.close()
-    
-    def close(self):
-        if self.engine and not self.engine.closed:
-            self.engine.close()
-            self.engine = None
     
     def fetch(self,sql):
         try:
@@ -63,6 +45,7 @@ class PostgreSql(DbDriver):
             return res
         except Exception as e:
             log.error("DB operation error: {} at {}".format(e, self.db_name))
+            raise
 
     def change(self, sql):
         try:
@@ -72,4 +55,5 @@ class PostgreSql(DbDriver):
             return res
         except Exception as e:
             log.error("DB operation error: {} at {}; \"{}\"".format(e, self.db_name, sql))
+            raise
 

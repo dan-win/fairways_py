@@ -1,51 +1,53 @@
 from fairways.io.generic.db import DbDriver
 
-import asyncio
-
 import logging
 
 log = logging.getLogger()
 
-class AsyncDbDriver(DbDriver):
+class SynDbDriver(DbDriver):
 
-    async def _ensure_connection(self):
+    def _ensure_connection(self):
         if self.is_connected():
             return
         log.warning("Restoring DB connection: {}".format(self.db_name))
-        await self._connect()
+        self._connect()
 
-    async def _connect(self):
+    def _connect(self):
         raise NotImplementedError(f"Override _connect for {self.__class__.__name__}")
-    
-    async def close(self):
+
+    def __del__(self):
+        if self:
+            self.close()
+
+    def close(self):
         if self.is_connected():
-            await self.engine.close()
+            self.engine.close()
             self.engine = None
 
-    async def fetch(self,sql):
+    def fetch(self,sql):
         try:
-            await self._ensure_connection()
-            async with self.engine.execute(sql) as cursor:
-                return await cursor.fetchall()
+            self._ensure_connection()
+            with self.engine.execute(sql) as cursor:
+                return cursor.fetchall()
         except Exception as e:
             log.error("DB operation error: {} at {}".format(e, self.db_name))
             raise
         finally:
             if self.autoclose:
-                await self.close()
+                self.close()
 
-    async def change(self, sql):
+    def change(self, sql):
         try:
-            await self._ensure_connection()
-            await self.engine.execute(sql)
+            self._ensure_connection()
+            self.engine.execute(sql)
             log.debug("EXECUTING...........")
-            await self.engine.commit()
+            self.engine.commit()
         except Exception as e:
             log.error("DB operation error: {} at {}; {}".format(e, self.db_name, sql))
             raise
         finally:
             if self.autoclose:
-                await self.close()
+                self.close()
 
     # Inherited (note: sync method, acts as a proxy to coroutine):
     # def get_records(self, query_template, **params):

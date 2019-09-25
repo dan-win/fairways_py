@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock
 
 def setUpModule():
     pass
@@ -18,29 +19,31 @@ class DbiTasksTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        import asyncio
-        from fairways.io.asyn import sqlite
-        from fairways.io.sync import dbi
+        from fairways.ci import helpers
+        cls.run_asyn = helpers.run_asyn
 
+        from fairways.io.asyn import sqlite
+        from fairways.io.generic import dbi
         from fairways.decorators import asyncmethod
 
-        import time
+        import asyncio
         import concurrent.futures
         import re
-        import os
-        cls.asyncio = asyncio
-        cls.sqlite = sqlite
+        import os, sys
         cls.dbi = dbi
         cls.asyncmethod = asyncmethod
-        cls.time = time
+        cls.asyncio = asyncio
         cls.futures = concurrent.futures
+        cls.sqlite = sqlite
         cls.re = re
+        cls.os = os
+        
         cls.clean_test_db()
+        root = helpers.getLogger()
 
     @classmethod
     def tearDownClass(cls):
         cls.clean_test_db()
-
 
     def test_dba(self):
         """
@@ -49,12 +52,14 @@ class DbiTasksTestCase(unittest.TestCase):
         sqlite = self.sqlite
         asyncio = self.asyncio
         asyncmethod = self.asyncmethod
-        db_alias = self.db_test_file
         Driver = sqlite.SqLite
+
         manager = dbi.DbTaskSetManager()
+        db_alias = "TEST_SQLITE"
 
         @manager.set_dba
         class TestTaskSet(dbi.DbTaskSet):
+
             CREATE_TABLE = dbi.Query(
                 """CREATE TABLE fairways (
                     id integer primary key,
@@ -81,27 +86,17 @@ class DbiTasksTestCase(unittest.TestCase):
 
         ctx = {}
 
-
         @asyncmethod.io_task
         @manager.inject_dba_decorator(manager)
         async def test(ctx, dba=None):
-            try:
-                await dba.CREATE_TABLE.execute()
-                await dba.INSERT_DATA.execute()
-                result = await dba.SELECT_DATA.get_records()
-            except Exception as e:
-                print(f"--->{e}")
-
-        # result = run_asyn(test(ctx))
-        result = test(ctx)
+            await dba.CREATE_TABLE.execute()
+            await dba.INSERT_DATA.execute()
+            result = await dba.SELECT_DATA.get_records()
+            return result
+    
+        with unittest.mock.patch.dict('os.environ', {db_alias: self.db_test_file}, clear=True):
+            result = test(ctx)
 
         self.assertEqual(result, [{'name': 'My Way'}])
 
 
-def run_asyn(coro_obj):
-    import asyncio
-    loop = asyncio.get_event_loop()
-    task = asyncio.ensure_future(coro_obj, loop=loop)
-    # Note that "gather" wraps results into list:
-    (result,) = loop.run_until_complete(asyncio.gather(task))
-    return result
