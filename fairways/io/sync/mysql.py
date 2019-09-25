@@ -35,8 +35,16 @@ class MySql(DbDriver):
     def __init__(self, env_varname='DB_CONN', default='mysql://user:password@localhost:3306/nodb'):
         self.conn_str = os.getenv(env_varname, default)
         self.engine = None
-
         self._connect()
+    
+    def __del__(self):
+        if self:
+            self.close()
+    
+    def close(self):
+        if self.engine and self.engine.open:
+            self.engine.close()
+            self.engine = None
     
     def fetch(self,sql):
         try:

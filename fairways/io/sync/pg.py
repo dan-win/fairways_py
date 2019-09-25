@@ -39,13 +39,19 @@ class PostgreSql(DbDriver):
             # cursorclass=_DictCursor,
             autocommit=True)
 
-
     def __init__(self, env_varname='DATABASE_URL', default='localhost:5432'):
         self.conn_str = os.getenv(env_varname, default)
         self.engine = None
-
         self._connect()
     
+    def __del__(self):
+        if self:
+            self.close()
+    
+    def close(self):
+        if self.engine and not self.engine.closed:
+            self.engine.close()
+            self.engine = None
     
     def fetch(self,sql):
         try:

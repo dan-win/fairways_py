@@ -10,50 +10,52 @@ import logging
 log = logging.getLogger(__name__)
 
 class SqLite(DbDriver):
+
     @property
     def db_name(self):
         return self.conn_str.split("/")[-1]
-
-    def _ensure_connection(self):
-        if not self.engine: 
-            log.warning("Restoring DB connection: {}".format(self.db_name))
-            self._connect()
     
     def _connect(self):
         db_filename = self.conn_str
-        self.engine = sqlite3.connect(db_filename)
-        self.engine.islolation_level = "IMMEDIATE"
-
+        engine = sqlite3.connect(db_filename)
+        engine.row_factory = dict_factory
+        engine.isolation_level = "IMMEDIATE"
+        return engine
 
     def __init__(self, env_varname='DB_CONN', default=":memory:"):
         self.conn_str = os.getenv(env_varname, default)
-        assert self.conn_str, "SqLite error: you should specify either environment variable or default value for database file name"
-        self.engine = None
+        self.lock_count = 0
             
     def fetch(self,sql):
+        db = None
         try:
-            self._ensure_connection()
-            with self.engine.cursor() as cursor:
-                cursor.execute(sql)
-                res = cursor.fetchall()
-            return res
+            db = self._connect()
+            with db.execute(sql) as cursor:
+                return cursor.fetchall()
         except Exception as e:
             log.error("DB operation error: {} at {}".format(e, self.db_name))
+            raise
         finally:
-            self.engine.close()
-            self.engine = None
+            if db:
+                db.close()
 
     def change(self, sql):
+        db = None
         try:
-            self._ensure_connection()
-            with self.engine.cursor() as cursor:
-                res = cursor.execute(sql)
-            return res
+            db = self._connect()
+            db.execute(sql)
+            db.commit()
+            return None
         except Exception as e:
             log.error("DB operation error: {} at {}; {}".format(e, self.db_name, sql))
+            raise
         finally:
-            self.engine.commit()
-            self.engine.close()
-            self.engine = None
+            if db:
+                db.close()
 
 
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d

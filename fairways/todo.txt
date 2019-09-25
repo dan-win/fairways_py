@@ -1,0 +1,10 @@
+flatten chain sequence as array? (recursion vs iteration, see: https://www.quora.com/In-Python-which-is-more-efficient-to-use-recursion-or-iteration)
+middleware <--- as chain + decorators
+trigger chains via Event or Queue, not include???
+
+Chains: additional methods like .on, .when, .join, .merge can be constructed combining "middleware. Try to avoid nested calls (!)
+
+Chains as "lazy" computations. 
+
+
+asyncmethod decorators - handle exceptions inside decorated func!

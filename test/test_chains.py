@@ -201,6 +201,84 @@ class ChainsTestCase(unittest.TestCase):
         self.assertEqual(result, {'nested': {'alien-event': 1, 'data': 'should be unchanged'}})
 
 
+    def test_catch_no_error(self):
+        Chain = self.Chain
+
+        error_trace = []
+        arg = []
+
+        def step1(arg):
+            return arg + [1]
+
+        def step2(arg):
+            return arg + [2]
+
+        def step3(arg):
+            return arg + [3]
+        
+        def handle_error(error):
+            error_trace.append("catched")
+
+        def step4(arg):
+            return arg + ["always"]
+
+        result = Chain(
+                arg
+            ).then(
+                step1
+            ).then(
+                step2
+            ).then(
+                step3
+            ).catch(
+                handle_error
+            ).then(
+                step4
+            ).value
+
+        self.assertEqual(result, [1, 2, 3, 'always'])
+        self.assertEqual(error_trace, [])
+
+    def test_catch_on_error(self):
+        Chain = self.Chain
+
+        error_trace = []
+        arg = []
+
+        def step1(arg):
+            return arg + [1]
+
+        def step2(arg):
+            return arg + [2]
+
+        def step_with_exception(arg):
+            1/0
+            return arg + [3]
+        
+        def handle_error(error):
+            print(f">>>>>>>>>>>>>>> handle_error: {error}")
+            error_trace.append("catched")
+
+        def step4(arg):
+            return arg + ["always"]
+
+        result = Chain(
+                arg
+            ).then(
+                step1
+            ).then(
+                step2
+            ).then(
+                step_with_exception
+            ).catch(
+                handle_error
+            ).then(
+                step4
+            ).value
+
+        self.assertEqual(result, [1, 2, 'always'])
+        self.assertEqual(error_trace, ['catched'])
+
 
 
 
