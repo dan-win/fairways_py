@@ -8,3 +8,5 @@ Chains as "lazy" computations.
 
 
 asyncmethod decorators - handle exceptions inside decorated func!
+
+"features", "flavors" - separate dependencies from 3rd-party packs (redis, ...)

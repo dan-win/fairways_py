@@ -29,10 +29,20 @@ def getLogger():
     root.addHandler(handler)
     return root
 
-def run_asyn(coro_obj):
+def run_asyn(coro_obj, new_loop=True):
     import asyncio
-    loop = asyncio.get_event_loop()
-    task = asyncio.ensure_future(coro_obj, loop=loop)
-    # Note that "gather" wraps results into list:
-    (result,) = loop.run_until_complete(asyncio.gather(task))
-    return result
+    own_loop = None
+    if new_loop:
+        own_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(own_loop)
+        loop = own_loop
+    else:
+        loop = asyncio.get_event_loop()
+    try:
+        task = asyncio.ensure_future(coro_obj, loop=loop)
+        # Note that "gather" wraps results into list:
+        (result,) = loop.run_until_complete(asyncio.gather(task))
+        return result
+    finally:
+        if own_loop:
+            own_loop.close()

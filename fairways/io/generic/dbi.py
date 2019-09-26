@@ -2,6 +2,9 @@
 
 __all__ = ["ConnectionPool", "DbTaskSetManager", "DbTaskSet", "Query", "FixtureQuery"]
 
+"""High-level entities
+"""
+
 import inspect
 import functools
 from contextlib import contextmanager
@@ -37,7 +40,67 @@ class BaseQuery(object):
 
 
 class Query(BaseQuery):
-    def __init__(self, sql, db_env_conf, driver, meta=None):
+
+    def __init__(self, template, db_env_conf, driver, meta=None):
+        """Creates new instance of IO task 
+        
+        Arguments:
+            template {any} -- Template (constant part) of query
+            db_env_conf {str} -- Name of environment variable wich holds config
+            driver {DbDriver} -- DbDriver subclass
+            meta {dict} -- Any QA data to store with the task instance
+        """
+        # self.task_id = 'TASK_ID_DB_FETCH_' + self.name.upper()
+        # print("DbTaskSet - init instance", self)
+        self.template = template
+        self.db_env_conf = db_env_conf
+        self.driver = driver
+        self.meta = meta
+    
+    def _transform_params(self, params):
+        return params
+                
+    def get_records(self, **params):
+        """Fetch records from associated storage
+        
+        Returns:
+            list -- List of records as a result of query
+        """
+
+        params = self._transform_params(params)
+
+        connection = ConnectionPool.select(self.driver, self.db_env_conf)
+        try:
+            log.debug(f"TRACE QUERY: {self.driver} | {self.db_env_conf} | {self.template} ")
+            return connection.get_records(self.template, **params)
+        except Exception as e:
+            log.error("Error with DB read: {!r}; SQL: {}".format(e, self.template))
+            raise
+
+
+    def execute(self, **params):
+        """Change data in associated storage
+        
+        Returns:
+            int -- Number of records affected. 
+            This value can be ignored in future
+        """
+
+        params = self._transform_params(params)
+
+        connection = ConnectionPool.select(self.driver, self.db_env_conf)
+        try:
+            log.debug(f"TRACE QUERY: {self.driver} | {self.db_env_conf} | {self.template} ")
+            return connection.execute(self.template, **params)
+        except Exception as e:
+            log.error("Error with DB write: {!r}; SQL: {}".format(e, self.template))
+            raise
+
+
+
+class SqlQuery(Query):
+    
+    def __init__(self, sql: str, db_env_conf: str, driver, meta=None):
         """Creates new instance of DB task 
         
         Arguments:
@@ -46,13 +109,8 @@ class Query(BaseQuery):
             driver {DbDriver} -- DbDriver subclass
             meta {dict} -- Any data to store with the task instance
         """
-        # self.task_id = 'TASK_ID_DB_FETCH_' + self.name.upper()
-        # print("DbTaskSet - init instance", self)
-        self.sql = sql
-        self.db_env_conf = db_env_conf
-        self.driver = driver
-        self.meta = meta
-    
+        super().__init__(self, sql, db_env_conf, driver, meta)
+
     def _transform_params(self, sql_params):
         def fmt_item(value, nested=True):
             if isinstance(value, (set, map, type({}.keys()))):
@@ -75,44 +133,6 @@ class Query(BaseQuery):
         for key, value in sql_params.items():
             sql_params[key] = fmt_item(value, nested=False)
         return sql_params
-                
-    def get_records(self, **sql_params):
-        """Fetch records from associated storage
-        
-        Returns:
-            list -- List of records as a result of query
-        """
-
-        sql_params = self._transform_params(sql_params)
-
-        db = ConnectionPool.select(self.driver, self.db_env_conf)
-        try:
-            res = db.get_records(self.sql, **sql_params)
-            print(f"TRACE QUERY: {self.driver} | {self.db_env_conf} | {self.sql} || {res}")
-            return res
-        except Exception as e:
-            log.error("Error with DB read: {!r}; SQL: {}".format(e, self.sql))
-            raise
-
-
-    def execute(self, **sql_params):
-        """Change data in associated storage
-        
-        Returns:
-            int -- Number of records affected. 
-            This value can be ignored in future
-        """
-
-        sql_params = self._transform_params(sql_params)
-
-        db = ConnectionPool.select(self.driver, self.db_env_conf)
-        try:
-            res = db.execute(self.sql, **sql_params)
-            print(f"TRACE QUERY: {self.driver} | {self.db_env_conf} | {self.sql} || {res}")
-            return res
-        except Exception as e:
-            log.error("Error with DB write: {!r}; SQL: {}".format(e, self.sql))
-            raise
 
 
 class FixtureQuery(BaseQuery):
@@ -273,27 +293,3 @@ class DbTaskSet(metaclass=debug):
         return queries
 
 
-
-# class DbDriver:
-#     def fetch(self, sql):
-#         raise NotImplementedError()
-
-#     def change(self, sql):
-#         raise NotImplementedError()
-
-#     def get_records(self, query_template, **params):
-#         """
-#         Return list of records
-#         """
-#         # Convert all iterables to lists to 
-#         query = query_template.format(**params).replace('\n', " ").replace("\"", "\'")
-#         # log.debug("SQL: {}".format(query))
-#         return self.fetch(query)
-
-#     def execute(self, query_template, **params):
-#         """
-#         Modify records in storage
-#         """
-#         query = query_template.format(**params)
-#         # log.debug("SQL: {}".format(query))
-#         return self.change(query)

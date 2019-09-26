@@ -17,6 +17,7 @@ else
     # python -m unittest discover -s "$readlink"/test -v
 
     python -m unittest discover -s "$readlink"/test -p "$test_module"  -v
+    # python -m unittest discover -p "$test_module"  -v
 
 fi
 

@@ -1,3 +1,6 @@
+"""Low-level entities (transport)
+"""
+
 import os
 
 import logging
