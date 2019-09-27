@@ -8,6 +8,7 @@ __all__ = ["ConnectionPool", "DbTaskSetManager", "DbTaskSet", "Query", "FixtureQ
 import inspect
 import functools
 from contextlib import contextmanager
+from .types import (HttpQueryTemplate, HttpQueryParams)
 from enum import Enum
 import logging
 log = logging.getLogger(__name__)
@@ -146,6 +147,43 @@ class FixtureQuery(BaseQuery):
     def execute(self, *args, **kwargs):
         """ Dummy execute method"""
         log.info("Fake execute: [%s] %s %s", self.name, args, kwargs)
+
+
+
+class HttpQuery(Query):
+    def __init__(self, template: HttpQueryTemplate, env_conf, driver, meta=None):
+        """Creates new instance of IO task 
+        
+        Arguments:
+            template {dict} -- Template (constant part) of query
+            env_conf {str} -- Name of environment variable wich holds config
+            driver {DbDriver} -- DbDriver subclass
+            meta {dict} -- Any QA data to store with the task instance
+        """
+        super().__init__(template, env_conf, driver, meta)
+    
+    def _transform_params(self, params) -> HttpQueryParams:
+        # data, *path_args, **query_args
+        # data = param
+        # Convert all iterables to lists to 
+        # method = params.get("method", "GET")
+        path_args = params.get("path_args", {})
+        query_args = params.get("query_args", {})
+        data = params.get("data", None)
+        # headers = params.get("headers", {})
+        # content_type = params.get('content-encoding', '................')
+        return self.template.render(data, *path_args, **query_args)
+        # url = url_template.format(**url_args)
+        # if method == 'POST':
+        #     pass
+        # else:
+        #     pass
+        #     # url = f"{url}?{}"
+        # # log.debug("SQL: {}".format(query))
+
+        # return params
+
+
 
 
 # class DbType(type):
