@@ -1,5 +1,6 @@
 INSTALLED_APPS = [
     "examples.dummy_pool",
+    "examples.db_pool",
 ]
 
 # ENTRYPOINTS = "pools.entries"
@@ -71,4 +72,8 @@ LOGGING = {
         }
     }
 
+}
+
+CONNECTIONS = {
+    "db_sqlite_example": ":memory:"
 }

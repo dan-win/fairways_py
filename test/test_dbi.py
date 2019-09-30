@@ -14,34 +14,37 @@ def tearDownModule():
 class DbiTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from fairways.io.generic.dbi import (DbTaskSetManager, DbTaskSet, Query, FixtureQuery)
-        cls.DbTaskSetManager = DbTaskSetManager
-        cls.DbTaskSet = DbTaskSet
-        cls.Query = Query
-        cls.FixtureQuery = FixtureQuery
+        from fairways.io import generic as io_generic 
+        from fairways import decorators
+        cls.io_generic = io_generic
+
+        cls.decorators = decorators
+        import unittest.mock
 
     @classmethod
     def tearDownClass(cls):
         pass
+    
+
+    def setUp(self):
+        self.decorators.connection.define.reset_registry()
 
     def test_create(self):
         """
         """
-        DbTaskSetManager = self.DbTaskSetManager
-        DbTaskSet = self.DbTaskSet
-        Query = self.Query
+        QueriesSet = self.io_generic.QueriesSet
+        SqlQuery = self.io_generic.SqlQuery
+        decorators = self.decorators
 
-        manager = DbTaskSetManager()
-
-        @manager.set_dba
-        class TestDb(DbTaskSet):
-            QUERY1 = Query(
+        @decorators.connection.define()
+        class TestDb(QueriesSet):
+            QUERY1 = SqlQuery(
                 "select * from t1",
                 "DB_CONN",
                 lambda x: x
             )
 
-        @DbTaskSetManager.inject_dba_decorator(manager)
+        @decorators.use.connection('dba')
         def test(ctx, dba=None, unused_arg=None):
             return dba
 
@@ -49,92 +52,49 @@ class DbiTestCase(unittest.TestCase):
 
         attrs = [name for name in dir(db) if not name.startswith('_')]
         # self.assertEqual(attrs, ['queries'])
-        self.assertTrue(isinstance(db.QUERY1, Query))
+        self.assertTrue(isinstance(db.QUERY1, SqlQuery))
 
     def test_create_fixture(self):
         """
         """
-        DbTaskSetManager = self.DbTaskSetManager
-        DbTaskSet = self.DbTaskSet
-        Query = self.Query
-        FixtureQuery = self.FixtureQuery
+        QueriesSet = self.io_generic.QueriesSet
+        SqlQuery = self.io_generic.SqlQuery
+        FixtureQuery = self.io_generic.FixtureQuery
+        decorators = self.decorators
 
-        manager = DbTaskSetManager()
-
-        @manager.set_dba
-        class TestDb(DbTaskSet):
-            QUERY1 = Query(
+        @decorators.connection.define()
+        class TestDb(QueriesSet):
+            QUERY1 = SqlQuery(
                 "select * from t1",
                 "DB_CONN",
                 lambda x: x
             )
 
-        @DbTaskSetManager.inject_dba_decorator(manager)
+        class MyLocalFixture(QueriesSet):
+            QUERY1 = FixtureQuery(
+                [{"name": "fixture value"}]
+            )
+
+        @decorators.use.connection("dba")
         def test(ctx, dba=None, unused_arg=None):
             return dba
 
-        self.assertEqual(test(None).__name__, 'TestDb', 
+        result = test(None)
+
+        self.assertEqual(result.__name__, 'TestDb', 
             "Current DbTaskSetManager should be same as used for last 'use_db' invocation")
 
-        manager.add_fixture("MyLocalFixture",
-            QUERY1 = [{"name": "value"}]
-        )
-
-        saved = manager.select_profile("MyLocalFixture")
-
-        fixture = test(None)
+        module_conn = decorators.connection.define.find_module_entity(__name__)
+        with unittest.mock.patch.object(module_conn, "subject", MyLocalFixture):
+            fixture = test(None)
 
         print("Test stringify behaviour: %s" % fixture)
 
-        self.assertEqual(fixture.QUERY1.get_records(), [{'name': 'value'}])
-        self.assertEqual(test(None).__name__, 'MyLocalFixture')
-
-        manager.select_profile(saved)
+        self.assertEqual(fixture.QUERY1.get_records(), [{'name': 'fixture value'}])
+        self.assertEqual(fixture.__name__, 'MyLocalFixture')
 
         self.assertEqual(test(None).__name__, 'TestDb', 
-            "Current DbTaskSet should be same as used for last 'set_module_db_taskset' invocation")
-
-    def test_create_fixture_context(self):
-        """
-        """
-        DbTaskSetManager = self.DbTaskSetManager
-        DbTaskSet = self.DbTaskSet
-        Query = self.Query
-        FixtureQuery = self.FixtureQuery
-
-        manager = DbTaskSetManager()
-
-        @manager.set_dba
-        class TestDb(DbTaskSet):
-            QUERY1 = Query(
-                "select * from t1",
-                "DB_CONN",
-                lambda x: x
-            )
-
-        @DbTaskSetManager.inject_dba_decorator(manager)
-        def test(ctx, dba=None, unused_arg=None):
-            return dba
-
-        self.assertEqual(test(None).__name__, 'TestDb', 
-            "Current DbTaskSetManager should be same as used for last 'use_db' invocation")
-
-        manager.add_fixture("MyLocalFixture",
-            QUERY1 = [{"name": "value"}]
-        )
-        
-        with manager.another_context("MyLocalFixture"):
-
-            fixture = test(None)
-
-            print("Test stringify behaviour: %s" % fixture)
-
-            self.assertEqual(fixture.QUERY1.get_records(), [{'name': 'value'}])
-            self.assertEqual(test(None).__name__, 'MyLocalFixture')
-
-        self.assertEqual(test(None).__name__, 'TestDb', 
-            "Profile should be restored after exit form contexdt manager")
+            "Current QueriesSet should be same as used for last 'set_module_db_taskset' invocation")
 
 
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
+

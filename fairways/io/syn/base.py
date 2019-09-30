@@ -1,10 +1,10 @@
-from fairways.io.generic.db import DbDriver
+from fairways.io.generic import DataDriver
 
 import logging
 
 log = logging.getLogger()
 
-class SynDbDriver(DbDriver):
+class SynDataDriver(DataDriver):
 
     def _ensure_connection(self):
         if self.is_connected():
@@ -40,7 +40,6 @@ class SynDbDriver(DbDriver):
         try:
             self._ensure_connection()
             self.engine.execute(sql)
-            log.debug("EXECUTING...........")
             self.engine.commit()
         except Exception as e:
             log.error("DB operation error: {} at {}; {}".format(e, self.db_name, sql))

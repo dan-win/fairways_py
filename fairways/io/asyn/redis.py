@@ -1,4 +1,4 @@
-from .base import AsyncDbDriver
+from .base import AsyncDataDriver
 # Should provice async methods .fetch, .execute
 
 import asyncio
@@ -7,7 +7,7 @@ import aioredis
 import logging
 log = logging.getLogger(__name__)
 
-class RedisDriver(AsyncDbDriver):
+class RedisDriver(AsyncDataDriver):
     default_conn_str = "redis://localhost"
     autoclose = True
 

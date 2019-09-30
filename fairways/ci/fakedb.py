@@ -76,7 +76,7 @@ class MODES:
 
 class fixture:
     """
-    Decorator with fake data form DbTaskSet
+    Decorator with fake data form QueriesSet
     """
     def __init__(self, 
             test_mode_attr="FAKE_DB_MODE", 
@@ -386,10 +386,10 @@ if __name__ == "__main__":
     if path not in sys.path:
         sys.path.append(path)
 
-    from api.io import (DbTaskSet)
+    from fairways.io import (QueriesSet)
 
     @fixture(True)
-    class TestDbSet(DbTaskSet):
+    class TestDbSet(QueriesSet):
         TEST_1 = (
             "select * from table1",
             "NODB", 

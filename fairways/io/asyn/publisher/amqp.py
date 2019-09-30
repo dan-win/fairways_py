@@ -1,14 +1,15 @@
 import asyncio
 import aio_pika
 
-from .base import Publisher
+from fairways.io.generic.dbi import (BaseQuery, WriterMixin)
 # Re-export:
 from fairways.io.asyn.amqp import AmqpDriver
 
 import logging
 log = logging.getLogger(__name__)
 
-class AmqpPublisher(Publisher):
+class AmqpPublisher(BaseQuery, WriterMixin):
+    template_class = dict
 
     def _transform_params(self, params):
         options = self.template

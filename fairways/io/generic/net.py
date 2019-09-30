@@ -1,15 +1,8 @@
+from .base import (BaseQuery, ReaderMixin, WriterMixin)
+
 import json
 import urllib.parse
 
-class HttpQueryParams:
-
-    def __init__(self, **kwargs):
-        self.method = kwargs.get('method', 'GET').lower()
-        self.content_type = kwargs.get('content_type', 'application/x-www-form-urlencoded').lower()
-        self.headers = kwargs.get('headers', {})
-        self.url = kwargs['url']
-        self.body = kwargs.get('body', None)
-    
 
 class HttpQueryTemplate:
 
@@ -56,3 +49,24 @@ class HttpQueryTemplate:
             url = self.url(*path_args, **query_args),
             body = self.body(data)
         )
+
+
+class HttpQuery(BaseQuery, ReaderMixin, WriterMixin):
+    template_class = HttpQueryTemplate
+    
+    def _transform_params(self, params): # -> dict
+        path_args = params.get("path_args", {})
+        query_args = params.get("query_args", {})
+        data = params.get("data", None)
+        return self.template.render(data, *path_args, **query_args)
+
+
+class HttpQueryParams:
+
+    def __init__(self, **kwargs):
+        self.method = kwargs.get('method', 'GET').lower()
+        self.content_type = kwargs.get('content_type', 'application/x-www-form-urlencoded').lower()
+        self.headers = kwargs.get('headers', {})
+        self.url = kwargs['url']
+        self.body = kwargs.get('body', None)
+    

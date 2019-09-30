@@ -49,7 +49,7 @@ class App:
             pool = sys.modules[poolname]
 
             if entrypoint:
-                e = ff.find(Channel.items(), lambda r: r.channel_tag == entrypoint and r.module == poolname)
+                e = ff.find(Channel.items(), lambda r: r.mark_name == entrypoint and r.module == poolname)
                 # e = triggers.enum_module_triggers(poolname, tag=entrypoint)
                 if e is None:
                     raise KeyError("Module {} has no entypoint with type {}".format(poolname, entrypoint))
@@ -81,7 +81,7 @@ class App:
         """
         entrypoint = args.entrypoint or "cli"
 
-        entrypoints = ff.filter(Channel.items(), lambda e: e.channel_tag == entrypoint)
+        entrypoints = ff.filter(Channel.items(), lambda e: e.mark_name == entrypoint)
 
         log.info(f"Running {len(entrypoints)} triggers")
 

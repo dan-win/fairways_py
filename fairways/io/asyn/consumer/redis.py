@@ -1,18 +1,16 @@
 import asyncio
 import aioredis
 
-from .base import Consumer
+from fairways.io.generic.dbi import (BaseQuery, ReaderMixin)
 # Re-export:
 from fairways.io.asyn.redis import RedisDriver
 
 import logging
 log = logging.getLogger(__name__)
 
-class RedisConsumer(Consumer):
+class RedisConsumer(BaseQuery, ReaderMixin):
+    template_class = dict
     
-    # def _transform_params(self, params):
-    #     return params
-
     def _transform_params(self, params):
         options = self.template
         params = dict(

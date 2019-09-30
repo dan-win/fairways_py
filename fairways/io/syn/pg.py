@@ -12,12 +12,12 @@ except:
 import os
 import re
 
-from .base import SynDbDriver
+from .base import SynDataDriver
 
 import logging
 log = logging.getLogger(__name__)
 
-class PostgreSql(SynDbDriver):
+class PostgreSql(SynDataDriver):
 
     autoclose = False
 

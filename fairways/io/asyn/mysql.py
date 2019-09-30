@@ -5,12 +5,12 @@ import aiomysql
 import os
 import re
 
-from .base import AsyncDbDriver
+from .base import AsyncDataDriver
 
 import logging
 log = logging.getLogger(__name__)
 
-class MySql(AsyncDbDriver):
+class MySql(AsyncDataDriver):
     
     def is_connected(self):
         return self.engine and self.engine.open

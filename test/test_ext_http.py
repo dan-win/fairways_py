@@ -10,24 +10,16 @@ def tearDownModule():
 class HttpTestCase(unittest.TestCase):
     conn_str = "http://localhost:6370"
 
-    # @classmethod
-    # def clean_test_db(cls):
-    #     import os
-    #     if os.path.exists(cls.conn_str):
-    #         os.remove(cls.conn_str)
-
     @classmethod
     def setUpClass(cls):
         from fairways.ci import helpers
         cls.helpers = helpers
 
-        from fairways.io.generic import types #import HttpQueryTemplate
-        from fairways.io.sync.http import Http
-        from fairways.io.generic.dbi import HttpQuery
+        from fairways.io.generic import net
+        from fairways.io.syn.http import Http
 
-        cls.types = types
+        cls.net = net
         cls.driver = Http 
-        cls.query = HttpQuery
 
         import re
         import os
@@ -45,9 +37,9 @@ class HttpTestCase(unittest.TestCase):
         """
         """
         HttpDriver = self.driver 
-        HttpQuery = self.query 
 
-        HttpQueryTemplate = self.types.HttpQueryTemplate
+        HttpQuery = self.net.HttpQuery
+        HttpQueryTemplate = self.net.HttpQueryTemplate
 
         # default=":memory:"
         conn_alias = "MY_HTTP_CONN"
