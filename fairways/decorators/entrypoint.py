@@ -16,7 +16,7 @@ class EntrypointRegistryItem(RegistryItem):
         return self.subject
 
     def __str__(self):
-        return f"Entrypoint: {self.module}:{self.mark_name} / function: {self.handler.__name__}"
+        return f"Entrypoint: '{self.module}:{self.mark_name}' in function: '{self.handler.__name__}'"
 
 class Channel(Mark):
     mark_name = "channel"

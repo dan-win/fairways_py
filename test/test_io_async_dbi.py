@@ -7,7 +7,6 @@ def setUpModule():
 def tearDownModule():
     pass
 
-
 class DbiTasksTestCase(unittest.TestCase):
     db_test_file = "./test_dbi.sqlite"
 
@@ -20,13 +19,14 @@ class DbiTasksTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from fairways.ci import helpers
-        cls.run_asyn = helpers.run_asyn
+        cls.helpers = helpers
+        # cls.run_asyn = helpers.run_asyn
 
         from fairways.io import generic as io_generic 
         from fairways import decorators
         cls.io_generic = io_generic
 
-        from fairways.io import asyn
+        from fairways.io.asyn import sqlite as async_sqlite
 
         import asyncio
         import concurrent.futures
@@ -36,7 +36,7 @@ class DbiTasksTestCase(unittest.TestCase):
         cls.decorators = decorators
         cls.asyncio = asyncio
         cls.futures = concurrent.futures
-        cls.asyn = asyn
+        cls.async_sqlite = async_sqlite
         cls.re = re
         cls.os = os
         
@@ -52,11 +52,11 @@ class DbiTasksTestCase(unittest.TestCase):
         """
         QueriesSet = self.io_generic.QueriesSet
         SqlQuery = self.io_generic.SqlQuery
-        asyn = self.asyn
+        async_sqlite = self.async_sqlite
         asyncio = self.asyncio
         decorators = self.decorators
 
-        db_alias = "TEST_SQLITE"
+        db_alias = "TEST_SQLITE_ASYN"
 
         @decorators.connection.define()
         class TestTaskSet(QueriesSet):
@@ -67,28 +67,28 @@ class DbiTasksTestCase(unittest.TestCase):
                     name varchar
                 );""", 
                 db_alias, 
-                asyn.sqlite.SqLite,
+                async_sqlite.SqLite,
                 ()
             )
 
             INSERT_DATA = SqlQuery(
                 """insert into fairways (id, name) values (1, "My Way");""", 
                 db_alias, 
-                asyn.sqlite.SqLite,
+                async_sqlite.SqLite,
                 ()
             )
 
             SELECT_DATA = SqlQuery(
                 """select name from fairways where id=1;""", 
                 db_alias, 
-                asyn.sqlite.SqLite,
+                async_sqlite.SqLite,
                 ()
             )
 
         ctx = {}
 
-        @decorators.asyncmethod.io_task
-        @manager.inject_dba_decorator(manager)
+        # @decorators.asyncmethod.io_task
+        @decorators.use.connection("dba")
         async def test(ctx, dba=None):
             await dba.CREATE_TABLE.execute()
             await dba.INSERT_DATA.execute()
@@ -96,7 +96,8 @@ class DbiTasksTestCase(unittest.TestCase):
             return result
     
         with unittest.mock.patch.dict('os.environ', {db_alias: self.db_test_file}, clear=True):
-            result = test(ctx)
+            # result = test(ctx)
+            result = self.helpers.run_asyn(test(ctx))
 
         self.assertEqual(result, [{'name': 'My Way'}])
 

@@ -19,6 +19,7 @@ def io_task(func):
         try:
             loop = asyncio.get_event_loop()
         except Exception as e:
+            print("LOOP ERROR:", e)
             # Handle case when task lauched from TreadPoolExecutor wihtout running loop:
             local_loop = loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)

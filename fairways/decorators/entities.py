@@ -17,7 +17,6 @@ def register_decorator(cls):
     name = cls.mark_name
     DECORATORS[name] = cls
     source_module = cls.__module__
-    print(f"REGISTERING {cls} from module {source_module}")
     # setattr(sys.modules[__name__], name, cls)
     setattr(sys.modules[source_module], name, cls)
     return cls
@@ -31,7 +30,7 @@ class RegistryItem:
         self.doc = attrs["doc"]
     
     def __str__(self):
-        return f"Registry Item: {self.module}:{self.mark_name} / function: {self.subject.__name__}"
+        return f"Registry Item: '{self.module}:{self.mark_name}' / object: '{self.subject.__name__}'"
 
 class Mark:
     """[summary]
@@ -64,7 +63,7 @@ class Mark:
         return self.mark_name
 
     def __call__(self, subject):
-        print(f"\n@DECORATOR ->>> {self.mark_name} | {subject.__name__}\n")
+        print(f"\n@DECORATOR ->>> {self.mark_name} | {subject.__name__} | {subject.__module__}\n")
         if self.once_per_module and self.__class__.__name__ != Mark.__name__:
             if self.find_module_entity(subject.__module__):
                 raise Exception(f"Mark '{self.mark_name}' alredy defined in module '{subject.__module__}'")

@@ -12,6 +12,7 @@ import logging
 log = logging.getLogger(__name__)
 
 class SqLite(AsyncDataDriver):
+    
     default_conn_str = ":memory:"
     autoclose = True
 

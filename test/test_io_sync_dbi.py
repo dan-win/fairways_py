@@ -28,12 +28,12 @@ class DbiTasksTestCase(unittest.TestCase):
         cls.decorators = decorators
         import unittest.mock
 
-        from fairways.io import sync
+        from fairways.io.sync import sqlite as sync_sqlite
 
         import re
         import os, sys
 
-        cls.sync = sync
+        cls.sync_sqlite = sync_sqlite
         cls.re = re
         cls.os = os
         
@@ -51,9 +51,9 @@ class DbiTasksTestCase(unittest.TestCase):
         SqlQuery = self.io_generic.SqlQuery
         FixtureQuery = self.io_generic.FixtureQuery
         decorators = self.decorators
-        mock = self.mock
+        # mock = self.mock
 
-        sync = self.sync
+        sync_sqlite = self.sync_sqlite
 
         db_alias = "TEST_SQLITE"
 
@@ -66,28 +66,28 @@ class DbiTasksTestCase(unittest.TestCase):
                     name varchar
                 );""", 
                 db_alias, 
-                sync.sqlite.SqLite,
+                sync_sqlite.SqLite,
                 ()
             )
 
             INSERT_DATA = SqlQuery(
                 """insert into fairways (id, name) values (1, "My Way");""", 
                 db_alias, 
-                sync.sqlite.SqLite,
+                sync_sqlite.SqLite,
                 ()
             )
 
             SELECT_DATA = SqlQuery(
                 """select name from fairways where id=1;""", 
                 db_alias, 
-                sync.sqlite.SqLite,
+                sync_sqlite.SqLite,
                 ()
             )
 
         ctx = {}
 
         @decorators.use.connection("dba")
-        async def test(ctx, dba=None):
+        def test(ctx, dba=None):
             dba.CREATE_TABLE.execute()
             dba.INSERT_DATA.execute()
             result = dba.SELECT_DATA.get_records()

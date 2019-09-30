@@ -4,7 +4,7 @@ import requests
 import re
 
 from .base import SynDataDriver
-from fairways.io.generic.types import (HttpQueryParams)
+from fairways.io.generic.net import HttpQueryParams
 
 import urllib.parse
 

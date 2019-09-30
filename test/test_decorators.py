@@ -16,8 +16,9 @@ class DecoratorsTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # from fairways.api import core, triggers
-        from fairways.decorators import (entrypoint, use)
+        from fairways.decorators import (entrypoint, use, entities)
         cls.entrypoint = entrypoint
+        cls.entities = entities
         cls.use = use
         cls.os = os
 
@@ -27,6 +28,7 @@ class DecoratorsTestCase(unittest.TestCase):
 
     def test_decorator_tag(self):
         entrypoint = self.entrypoint
+        entities = self.entities
         # registry = self.core.registry
 
         # registry.reset()
@@ -40,20 +42,18 @@ class DecoratorsTestCase(unittest.TestCase):
 
         # should_be = self.triggers.enum_triggers()
         found = None
-        for r in entrypoint.Channel.items():
+        for r in entities.Mark.items():
             if r.mark_name == "qa" and r.module == modname:
                 found = r
                 break
 
-        # r = self.triggers.enum_triggers(module_name=modname, tag="cron")
-
-        # r = registry.cron
+        self.assertIsNotNone(found)
 
         should_be = {
-            "method": r.handler.__name__,
-            "mark_name": r.mark_name,
-            "module": r.module,
-            "doc": r.doc
+            "method": found.handler.__name__,
+            "mark_name": found.mark_name,
+            "module": found.module,
+            "doc": found.doc
         }
 
         self.assertIsNotNone(found)

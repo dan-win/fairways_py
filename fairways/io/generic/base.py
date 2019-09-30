@@ -95,11 +95,21 @@ class ConnectionPool:
     @classmethod
     def select(cls, driver_cls, env_varname):
         connection = cls._pool.get(env_varname)
-        if not connection:
+        if connection:
+            if driver_cls != connection.__class__:
+                raise ValueError(f"ConnectionPool: connection with name {env_varname} already registered for different class ({driver_cls} vs {connection.__class__})!")
+        else:
             connection = driver_cls(env_varname)
             cls._pool[env_varname] = connection
+
         # log.debug("Pool connections: {}".format(cls._pool))
         return connection
+    
+    @classmethod
+    def reset(cls):
+        while self._pool:
+            name, conn = self._pool.popitem()
+            del conn
 
 
 class BaseQuery(object):
