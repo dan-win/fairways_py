@@ -1,4 +1,4 @@
-from fairways.io.generic.db import DbDriver
+from fairways.io.generic import DataDriver
 
 import asyncio
 
@@ -6,7 +6,7 @@ import logging
 
 log = logging.getLogger()
 
-class AsyncDbDriver(DbDriver):
+class AsyncDataDriver(DataDriver):
 
     async def _ensure_connection(self):
         if self.is_connected():

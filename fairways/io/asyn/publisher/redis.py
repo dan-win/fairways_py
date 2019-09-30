@@ -1,17 +1,15 @@
 import asyncio
 import aioredis
 
-from .base import Publisher
+from fairways.io.generic.dbi import (BaseQuery, WriterMixin)
 # Re-export:
 from fairways.io.asyn.redis import RedisDriver
 
 import logging
 log = logging.getLogger(__name__)
 
-class RedisPublisher(Publisher):
-    
-    # def _transform_params(self, params):
-    #     return params
+class RedisPublisher(BaseQuery, WriterMixin):
+    template_class = dict
 
     def _transform_params(self, params):
         options = self.template

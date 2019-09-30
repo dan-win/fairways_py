@@ -87,7 +87,7 @@ if __name__ == "__main__":
     #     pool = sys.modules[poolname]
 
     #     if entrypoint:
-    #         e = _.filter(Channel.items(), lambda r: r.channel_tag == entrypoint and r.module == poolname)
+    #         e = _.filter(Channel.items(), lambda r: r.mark_name == entrypoint and r.module == poolname)
     #         # e = triggers.enum_module_triggers(poolname, tag=entrypoint)
     #         if e is None:
     #             raise KeyError("Module {} has no entypoint with type {}".format(poolname, entrypoint))
@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
     #     entrypoint = args.entrypoint or "cli"
 
-    #     entrypoints = _.filter(Channel.items(), lambda e: e.channel_tag == entrypoint)
+    #     entrypoints = _.filter(Channel.items(), lambda e: e.mark_name == entrypoint)
 
     #     log.info(f"Running {len(entrypoints)} triggers")
 

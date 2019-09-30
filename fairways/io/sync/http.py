@@ -3,7 +3,7 @@
 import requests
 import re
 
-from .base import SynDbDriver
+from .base import SynDataDriver
 from fairways.io.generic.types import (HttpQueryParams)
 
 import urllib.parse
@@ -11,7 +11,7 @@ import urllib.parse
 import logging
 log = logging.getLogger(__name__)
 
-class Http(SynDbDriver):
+class Http(SynDataDriver):
 
     autoclose = False
 

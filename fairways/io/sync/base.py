@@ -1,10 +1,10 @@
-from fairways.io.generic.db import DbDriver
+from fairways.io.generic import DataDriver
 
 import logging
 
 log = logging.getLogger()
 
-class SynDbDriver(DbDriver):
+class SynDataDriver(DataDriver):
 
     def _ensure_connection(self):
         if self.is_connected():

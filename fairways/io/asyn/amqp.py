@@ -1,4 +1,4 @@
-from .base import AsyncDbDriver
+from .base import AsyncDataDriver
 # Should provice async methods .fetch, .execute
 
 import asyncio
@@ -21,7 +21,7 @@ DEFAULT_QUEUE_SETTINGS = dict(
     passive = True,    
 )
 
-class AmqpDriver(AsyncDbDriver):
+class AmqpDriver(AsyncDataDriver):
     default_conn_str = "amqp://guest:guest@localhost:5672/%2f"
     autoclose = True
 

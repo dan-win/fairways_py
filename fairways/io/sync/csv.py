@@ -2,9 +2,9 @@
 
 import csv
 
-from .base import SynDbDriver
+from .base import SynDataDriver
 
-class Csv(SynDbDriver):
+class Csv(SynDataDriver):
 
     @property
     def file_name(self):

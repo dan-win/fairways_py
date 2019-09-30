@@ -22,19 +22,21 @@ class DbiTasksTestCase(unittest.TestCase):
         from fairways.ci import helpers
         cls.run_asyn = helpers.run_asyn
 
-        from fairways.io.asyn import sqlite
-        from fairways.io.generic import dbi
-        from fairways.decorators import asyncmethod
+        from fairways.io import generic as io_generic 
+        from fairways import decorators
+        cls.io_generic = io_generic
+
+        from fairways.io import asyn
 
         import asyncio
         import concurrent.futures
         import re
         import os, sys
-        cls.dbi = dbi
-        cls.asyncmethod = asyncmethod
+
+        cls.decorators = decorators
         cls.asyncio = asyncio
         cls.futures = concurrent.futures
-        cls.sqlite = sqlite
+        cls.asyn = asyn
         cls.re = re
         cls.os = os
         
@@ -48,45 +50,44 @@ class DbiTasksTestCase(unittest.TestCase):
     def test_dba(self):
         """
         """
-        dbi = self.dbi
-        sqlite = self.sqlite
+        QueriesSet = self.io_generic.QueriesSet
+        SqlQuery = self.io_generic.SqlQuery
+        asyn = self.asyn
         asyncio = self.asyncio
-        asyncmethod = self.asyncmethod
-        Driver = sqlite.SqLite
+        decorators = self.decorators
 
-        manager = dbi.DbTaskSetManager()
         db_alias = "TEST_SQLITE"
 
-        @manager.set_dba
-        class TestTaskSet(dbi.DbTaskSet):
+        @decorators.connection.define()
+        class TestTaskSet(QueriesSet):
 
-            CREATE_TABLE = dbi.Query(
+            CREATE_TABLE = SqlQuery(
                 """CREATE TABLE fairways (
                     id integer primary key,
                     name varchar
                 );""", 
                 db_alias, 
-                Driver,
+                asyn.sqlite.SqLite,
                 ()
             )
 
-            INSERT_DATA = dbi.Query(
+            INSERT_DATA = SqlQuery(
                 """insert into fairways (id, name) values (1, "My Way");""", 
                 db_alias, 
-                Driver,
+                asyn.sqlite.SqLite,
                 ()
             )
 
-            SELECT_DATA = dbi.Query(
+            SELECT_DATA = SqlQuery(
                 """select name from fairways where id=1;""", 
                 db_alias, 
-                Driver,
+                asyn.sqlite.SqLite,
                 ()
             )
 
         ctx = {}
 
-        @asyncmethod.io_task
+        @decorators.asyncmethod.io_task
         @manager.inject_dba_decorator(manager)
         async def test(ctx, dba=None):
             await dba.CREATE_TABLE.execute()

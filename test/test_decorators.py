@@ -41,7 +41,7 @@ class DecoratorsTestCase(unittest.TestCase):
         # should_be = self.triggers.enum_triggers()
         found = None
         for r in entrypoint.Channel.items():
-            if r.channel_tag == "qa" and r.module == modname:
+            if r.mark_name == "qa" and r.module == modname:
                 found = r
                 break
 
@@ -51,7 +51,7 @@ class DecoratorsTestCase(unittest.TestCase):
 
         should_be = {
             "method": r.handler.__name__,
-            "channel_tag": r.channel_tag,
+            "mark_name": r.mark_name,
             "module": r.module,
             "doc": r.doc
         }
@@ -60,7 +60,7 @@ class DecoratorsTestCase(unittest.TestCase):
 
         self.assertEqual(should_be, {
             'method': 'test_run', 
-            'channel_tag': 'qa', 
+            'mark_name': 'qa', 
             'module': __name__,
             'doc': 'DocString'})
 

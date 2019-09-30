@@ -5,13 +5,13 @@ import aiosqlite
 import os
 import re
 
-from .base import AsyncDbDriver
+from .base import AsyncDataDriver
 # Should provice async methods .fetch, .execute
 
 import logging
 log = logging.getLogger(__name__)
 
-class SqLite(AsyncDbDriver):
+class SqLite(AsyncDataDriver):
     default_conn_str = ":memory:"
     autoclose = True
 

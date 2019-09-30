@@ -20,8 +20,6 @@ from enum import Enum, IntEnum
 
 import fairways
 
-from fairways.io.sync import JsonStore, NullStore, Redis, MySql, ConnectionPool, DbTaskSetManager, DbTaskSet, Query, json_stream
-
 from fairways.decorators import entrypoint, use
 
 from fairways.chains import Chain 
@@ -32,9 +30,8 @@ from fairways.helpers import rows2dict
 
 from fairways.ci import (fakedb, utils)
 
-log = logging.getLogger("cron")
+log = logging.getLogger()
 
-# sched_logger = log
 
 # class AppState:
 #     def __init__(self):
