@@ -16,7 +16,7 @@ class HttpTestCase(unittest.TestCase):
         cls.helpers = helpers
 
         from fairways.io.generic import net
-        from fairways.io.sync.http import Http
+        from fairways.io.syn.http import Http
 
         cls.net = net
         cls.driver = Http 

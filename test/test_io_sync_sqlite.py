@@ -21,7 +21,7 @@ class SqLiteTestCase(unittest.TestCase):
         from fairways.ci import helpers
         cls.helpers = helpers
 
-        from fairways.io.sync import sqlite
+        from fairways.io.syn import sqlite
 
         import time
         import re

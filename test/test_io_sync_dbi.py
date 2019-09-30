@@ -28,7 +28,7 @@ class DbiTasksTestCase(unittest.TestCase):
         cls.decorators = decorators
         import unittest.mock
 
-        from fairways.io.sync import sqlite as sync_sqlite
+        from fairways.io.syn import sqlite as sync_sqlite
 
         import re
         import os, sys
