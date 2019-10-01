@@ -9,7 +9,8 @@ from fairways.log import init as init_log
 from fairways.conf import settings
 
 from fairways.funcflow import FuncFlow as ff
-from fairways.decorators.entrypoint import Channel, RegistryItem
+from fairways.decorators.entrypoint import QA, RegistryItem
+from fairways.decorators.entities import Mark
 
 import sys
 import argparse
@@ -32,7 +33,7 @@ class App:
         parser.add_argument('-d', '--data', type=str, default=None, help="Initial data for a pool in json format (ignored if no --pool specified)")
         group = parser.add_mutually_exclusive_group()
         group.add_argument('-t', '--task', type=str, default=None, help="Run selected task only (ignored if no --pool specified)")
-        group.add_argument('-e', '--entrypoint', type=str, default="test", choices=("cron", "amqp", "test", "cmd"), help="Selected entrypoint of a pool (ignored if no --pool specified)")
+        group.add_argument('-e', '--entrypoint', type=str, default="qa", choices=("cron", "amqp", "test", "cmd"), help="Selected entrypoint of a pool (ignored if no --pool specified)")
         # --dry-run option
         
         args = parser.parse_args()
@@ -49,7 +50,7 @@ class App:
             pool = sys.modules[poolname]
 
             if entrypoint:
-                e = ff.find(Channel.items(), lambda r: r.mark_name == entrypoint and r.module == poolname)
+                e = ff.find(Mark.items(), lambda r: r.mark_name == entrypoint and r.module == poolname)
                 # e = triggers.enum_module_triggers(poolname, tag=entrypoint)
                 if e is None:
                     raise KeyError("Module {} has no entypoint with type {}".format(poolname, entrypoint))
@@ -81,9 +82,10 @@ class App:
         """
         entrypoint = args.entrypoint or "cli"
 
-        entrypoints = ff.filter(Channel.items(), lambda e: e.mark_name == entrypoint)
+        entrypoints = ff.filter(Mark.items(), lambda e: e.mark_name == entrypoint)
 
         log.info(f"Running {len(entrypoints)} triggers")
 
         for handler in ff.map(entrypoints, lambda e: e.handler):
+            ctx = {}
             handler(ctx)

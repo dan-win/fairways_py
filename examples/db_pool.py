@@ -52,7 +52,7 @@ log = logging.getLogger()
 db_alias = 'db_sqlite_example'
 
 @connection.define()
-class TestTaskSet(QueriesSet):
+class ExampleQueriesSet(QueriesSet):
 
     CREATE_TABLE = SqlQuery(
         """CREATE TABLE fairways (
