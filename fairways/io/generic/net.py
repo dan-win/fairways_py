@@ -64,7 +64,7 @@ class HttpQueryTemplate:
             rq_kwargs["headers"] = headers
         body = encoded_data
         if body:
-            rq_kwargs["data"] = data
+            rq_kwargs["data"] = encoded_data
 
         return rq_kwargs
 
