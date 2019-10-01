@@ -42,7 +42,7 @@ class HttpTestCase(unittest.TestCase):
         HttpQueryTemplate = self.net.HttpQueryTemplate
 
         # default=":memory:"
-        conn_alias = "MY_HTTP_CONN"
+        conn_alias = __name__
 
         test_message = "MY MESSAGE"
 

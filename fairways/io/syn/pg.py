@@ -12,12 +12,12 @@ except:
 import os
 import re
 
-from .base import SynDataDriver
+from .base import (SynDataDriver, UriConnMixin)
 
 import logging
 log = logging.getLogger(__name__)
 
-class PostgreSql(SynDataDriver):
+class PostgreSql(SynDataDriver, UriConnMixin):
 
     autoclose = False
 

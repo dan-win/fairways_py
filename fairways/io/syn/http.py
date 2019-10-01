@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import requests
+from requests.auth import HTTPBasicAuth
 import re
 
-from .base import SynDataDriver
+from .base import (SynDataDriver, UriConnMixin)
 from fairways.io.generic.net import HttpQueryParams
 
 import urllib.parse
@@ -11,7 +12,7 @@ import urllib.parse
 import logging
 log = logging.getLogger(__name__)
 
-class Http(SynDataDriver):
+class Http(SynDataDriver, UriConnMixin):
 
     autoclose = False
 
@@ -23,8 +24,13 @@ class Http(SynDataDriver):
 
     def _make_request(self, **params):
         p = HttpQueryParams(**params)
-        abs_url = urllib.parse.urljoin(self.conn_str, p.url)
-        print(f'Abs url: {abs_url}')
+        uri_parts = self.uri_parts
+        root_url = f'{uri_parts.scheme}://{uri_parts.host}'
+        if uri_parts.port:
+            root_url = f'{root_url}:{uri_parts.port}'
+        abs_url = urllib.parse.urljoin(root_url, p.url)
+
+        log.debug(f'Abs url: {abs_url}')
 
         handler = getattr(requests, p.method)
         kwargs = {}
@@ -32,6 +38,12 @@ class Http(SynDataDriver):
             kwargs["data"] = p.body
         if p.headers:
             kwargs["headers"] = p.headers
+        
+        # check whether basic auth is necessary:
+        user, password = self.uri_parts.user, self.uri_parts.password
+
+        if user and password:
+            kwargs["auth"] = HTTPBasicAuth(user, password)
 
         response = handler(abs_url, **kwargs )
         response.raise_for_status()

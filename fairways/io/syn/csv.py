@@ -2,9 +2,9 @@
 
 import csv
 
-from .base import SynDataDriver
+from .base import (SynDataDriver, FileConnMixin)
 
-class Csv(SynDataDriver):
+class Csv(SynDataDriver, FileConnMixin):
 
     @property
     def file_name(self):

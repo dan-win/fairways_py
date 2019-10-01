@@ -3,12 +3,12 @@
 import pymysql
 import re
 
-from .base import SynDataDriver
+from .base import (SynDataDriver, UriConnMixin)
 
 import logging
 log = logging.getLogger(__name__)
 
-class MySql(SynDataDriver):
+class MySql(SynDataDriver, UriConnMixin):
 
     autoclose = False
 

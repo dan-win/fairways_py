@@ -7,7 +7,9 @@ __all__ = [
     "BaseQuery", 
     "ReaderMixin", 
     "WriterMixin", 
-    "FixtureQuery"
+    "FixtureQuery",
+    "UriConnMixin",
+    "FileConnMixin",
 ]
 
 """High-level entities
@@ -16,11 +18,77 @@ __all__ = [
 import inspect
 import functools
 from contextlib import contextmanager
-from typing import (List, Dict, NamedTuple)
+from typing import (List, Dict)
+from collections import namedtuple
+
 import logging
 log = logging.getLogger(__name__)
 
 import os
+import re
+
+RE_ENV_EXPRESSION = re.compile(r"\{\$(.*?)\}")
+# RE_URI_TEMPLATE = re.compile(r"(.*?)://(.*?):(.*?)@(.*?):(.*?)/(.*)")
+# RE_URI_TEMPLATE = re.compile(r"(.*?)://(.*?):(.*?)@(.*?):(.*?)/(.*)")
+RE_URI_TEMPLATE = re.compile(r"(?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>.*))?")
+
+UriParts = namedtuple('UriParts', 'scheme,user,password,host,port,path'.split(','))
+
+def replace_env_vars(s):
+    """Replace all occurences of {$name} in string with values from os.environ
+    
+    Arguments:
+        s {[str]} -- [description]
+    
+    Returns:
+        [str] -- [String with replaced values]
+    """
+    def envrepl(match):
+        (env_var,) = match.groups(1)
+        return os.environ[env_var]
+
+    return RE_ENV_EXPRESSION.sub(envrepl, s)
+
+def parse_conn_uri(s):
+    """Split uri to parts:
+    sheme, use, password, host, port, path.
+    Absent parts replaced with None
+    
+    Arguments:
+        s {[str]} -- [uri]
+    
+    Returns:
+        [UriParts] -- [Parsed uri]
+    """
+    match = RE_URI_TEMPLATE.match(s)
+    m = match.group
+    return UriParts(m('scheme'), m('user'), m('password'), m('host'), m('port'), m('path'))
+
+
+class UriConnMixin:
+    def _parse_uri(self, conn_uri):
+        """Returns UriParts tuple
+        
+        Arguments:
+            conn_uri {str} -- [description]
+        
+        Returns:
+            [UriParts] -- Parts of uri
+        """
+        return parse_conn_uri(conn_uri)
+
+class FileConnMixin:
+    def _parse_uri(self, conn_uri):
+        """Returns UriParts tuple
+        
+        Arguments:
+            conn_uri {str} -- [description]
+        
+        Returns:
+            [UriParts] -- Parts of uri
+        """
+        return UriParts(None, None, None, None, None, conn_uri)
+
 
 class DataDriver:
     """Base class for database driver
@@ -40,7 +108,9 @@ class DataDriver:
 
     @classmethod
     def set_config_provider(cls, config_dict):
+        prev_value = cls._config_provider
         cls._config_provider = config_dict
+        return prev_value
 
     @property
     def db_name(self):
@@ -48,14 +118,18 @@ class DataDriver:
     
     def is_connected(self):
         raise NotImplementedError(f"Override is_connected for {self.__class__.__name__}")
-
+    
     def __init__(self, env_varname):
         """Constructor
         
         Arguments:
             env_varname {str} -- Name of enviromnent variable which holds connection string (e.g.: "mysql://user@pass@host/db")
         """
-        self.conn_str = self._config_provider.get(env_varname, self.default_conn_str)
+        conn_uri_raw = self._config_provider.get(env_varname, self.default_conn_str)
+        conn_uri = replace_env_vars(conn_uri_raw)
+        self.conn_str = conn_uri
+        # Used from mixin:
+        self.uri_parts = self._parse_uri(conn_uri)
         log.debug(f"Loading {self}...")
         self.engine = None
 
@@ -86,6 +160,7 @@ class DataDriver:
         query = query_template.format(**params)
         # log.debug("SQL: {}".format(query))
         return self.change(query)
+
 
 
 class ConnectionPool:

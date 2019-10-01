@@ -4,13 +4,13 @@ import redis
 import os
 import re
 
-from .base import SynDataDriver
+from .base import (SynDataDriver, UriConnMixin)
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class Redis(SynDataDriver):
+class Redis(SynDataDriver, UriConnMixin):
     autoclose = False
     default_conn_str = 'localhost:6379'
 

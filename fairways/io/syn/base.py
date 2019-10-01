@@ -1,4 +1,4 @@
-from fairways.io.generic import DataDriver
+from fairways.io.generic import (DataDriver, UriConnMixin, FileConnMixin)
 
 import logging
 

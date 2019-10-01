@@ -4,12 +4,12 @@ import sqlite3
 import os
 import re
 
-from .base import SynDataDriver
+from .base import (SynDataDriver, FileConnMixin)
 
 import logging
 log = logging.getLogger(__name__)
 
-class SqLite(SynDataDriver):
+class SqLite(SynDataDriver, FileConnMixin):
 
     default_conn_str = ":memory:"
     autoclose = True

@@ -59,7 +59,7 @@ class AmqpPublishConsumeTestCase(unittest.TestCase):
         AmqpPublisher = self.amqp_pub.AmqpPublisher
 
         # default=":memory:"
-        db_alias = "MY_AMQP_CONN"
+        db_alias = __name__
 
         test_message = "MY MESSAGE"
 
