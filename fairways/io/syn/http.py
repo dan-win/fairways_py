@@ -3,6 +3,7 @@
 import requests
 from requests.auth import HTTPBasicAuth
 import re
+import json
 
 from .base import (SynDataDriver, UriConnMixin)
 from fairways.io.generic.net import HttpQueryParams
@@ -49,7 +50,6 @@ class Http(SynDataDriver, UriConnMixin):
         print("REQUEST PARAMS: %s, %s" % (abs_url, params))
 
         response = handler(abs_url, **params )
-        log.debug("Response text: %s", response.text)
         response.raise_for_status()
         return response
 
@@ -60,6 +60,19 @@ class Http(SynDataDriver, UriConnMixin):
         This method is common for sync and async implementations (in latter case it acts as a proxy for awaitable)
         """
         response = self._make_request(**params)
+
+        if params.get('stream') == True:
+            buffer = []
+
+            if response.encoding is None:
+                response.encoding = 'utf-8'
+
+            for line in response.iter_lines(decode_unicode=True):
+                if line:
+                    buffer.append(line)
+            serialized = ''.join(buffer)
+            return json.loads(serialized)
+
         return response.json()
 
     def execute(self, url_template, **params):

@@ -16,6 +16,7 @@ class HttpQueryTemplate:
         self.content_type = kwargs.get('content_type', 'application/x-www-form-urlencoded').lower()
         self._headers = kwargs.get('headers', {})
         self.url_template = kwargs['url']
+        self.stream = kwargs.get('stream', False)
     
     def url(self, *path_args, **query_args):
         """Url formatted from template and data supplied
@@ -62,9 +63,13 @@ class HttpQueryTemplate:
         headers = self.headers(encoded_data)
         if headers:
             rq_kwargs["headers"] = headers
+
         body = encoded_data
         if body:
             rq_kwargs["data"] = encoded_data
+
+        if self.stream:
+            rq_kwargs["stream"] = True
 
         return rq_kwargs
 
