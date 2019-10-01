@@ -24,7 +24,7 @@ from fairways.io.generic import (
     QueriesSet, 
     SqlQuery)
 
-from fairways.io.sync import (
+from fairways.io.syn.sqlite import (
     SqLite,
 )
 
