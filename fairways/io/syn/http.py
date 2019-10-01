@@ -23,29 +23,33 @@ class Http(SynDataDriver, UriConnMixin):
         pass
 
     def _make_request(self, **params):
-        p = HttpQueryParams(**params)
+        # p = HttpQueryParams(**params)
         uri_parts = self.uri_parts
         root_url = f'{uri_parts.scheme}://{uri_parts.host}'
         if uri_parts.port:
             root_url = f'{root_url}:{uri_parts.port}'
-        abs_url = urllib.parse.urljoin(root_url, p.url)
+        abs_url = urllib.parse.urljoin(root_url, params.pop("url"))
 
         log.debug(f'Abs url: {abs_url}')
 
-        handler = getattr(requests, p.method)
-        kwargs = {}
-        if p.body:
-            kwargs["data"] = p.body
-        if p.headers:
-            kwargs["headers"] = p.headers
+        handler = getattr(requests, params.pop("method"))
+
+        # kwargs = {}
+        # if p.body:
+        #     kwargs["data"] = p.body
+        # if p.headers:
+        #     kwargs["headers"] = p.headers
         
         # check whether basic auth is necessary:
         user, password = self.uri_parts.user, self.uri_parts.password
 
         if user and password:
-            kwargs["auth"] = HTTPBasicAuth(user, password)
+            params["auth"] = HTTPBasicAuth(user, password)
 
-        response = handler(abs_url, **kwargs )
+        print("REQUEST PARAMS: %s, %s" % (abs_url, params))
+
+        response = handler(abs_url, **params )
+        log.debug("Response text: %s", response.text)
         response.raise_for_status()
         return response
 

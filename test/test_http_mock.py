@@ -60,6 +60,8 @@ class HttpMockTestCase(unittest.TestCase):
                         request_args=self.request_args,
                         request_kwargs=self.request_kwargs
                     )
+                def text(self):
+                    return "Mock response"
                 def __init__(self, request_args, request_kwargs):
                     self.request_args = request_args
                     self.request_kwargs = request_kwargs
@@ -78,6 +80,7 @@ class HttpMockTestCase(unittest.TestCase):
             template = HttpQueryTemplate(
                 url="/{}/",
                 method='GET',
+                content_type='application/json',
             )
 
             client = HttpQuery(template, conn_alias, HttpDriver)
@@ -92,6 +95,8 @@ class HttpMockTestCase(unittest.TestCase):
         correct_url = 'http://test-api.com:8989/json/?fields=61439'
         
         self.assertEqual(result["request_args"], (correct_url,))
+
+        print(f"RESPONDE *** {result['request_args']}; {result['request_kwargs']}")
 
         auth_obj = result["request_kwargs"]["auth"]
 

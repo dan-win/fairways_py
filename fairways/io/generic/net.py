@@ -14,7 +14,7 @@ class HttpQueryTemplate:
     def __init__(self, **kwargs):
         self.method = kwargs.get('method', 'GET').lower()
         self.content_type = kwargs.get('content_type', 'application/x-www-form-urlencoded').lower()
-        self.headers = kwargs.get('headers', {})
+        self._headers = kwargs.get('headers', {})
         self.url_template = kwargs['url']
     
     def url(self, *path_args, **query_args):
@@ -32,23 +32,41 @@ class HttpQueryTemplate:
     def body(self, data):
         if data:
             if self.method in ('post', 'put', 'patch'):
+                content_type = self.content_type
                 try:
-                    content_type = self.content_type
                     encoder = self.encoders[content_type]
-                    return encoder(data)
                 except:
                     raise Exception(f"Unknown content-type: {content_type}")
+                return encoder(data)
+    
             raise Exception(f"Body not allowed for method: {self.method}")
             
-    
+    def headers(self, encoded_data):
+        result = self._headers.copy()
+        if encoded_data:
+            if self.method in ('post', 'put', 'patch'):
+                result.update({
+                    'Content-type': self.content_type,
+                    'Content-length': str(len(encoded_data))
+                })
+        return result
+            
     def render(self, data, *path_args, **query_args):
-        return dict(
-            method = self.method,
-            content_type = self.content_type,
-            headers = self.headers,
+        encoded_data = self.body(data)
+
+        rq_kwargs = dict(
             url = self.url(*path_args, **query_args),
-            body = self.body(data)
+            method = self.method,
         )
+
+        headers = self.headers(encoded_data)
+        if headers:
+            rq_kwargs["headers"] = headers
+        body = encoded_data
+        if body:
+            rq_kwargs["data"] = data
+
+        return rq_kwargs
 
 
 class HttpQuery(BaseQuery, ReaderMixin, WriterMixin):
@@ -64,8 +82,7 @@ class HttpQuery(BaseQuery, ReaderMixin, WriterMixin):
 class HttpQueryParams:
 
     def __init__(self, **kwargs):
-        self.method = kwargs.get('method', 'GET').lower()
-        self.content_type = kwargs.get('content_type', 'application/x-www-form-urlencoded').lower()
+        self.method = kwargs['method']
         self.headers = kwargs.get('headers', {})
         self.url = kwargs['url']
         self.body = kwargs.get('body', None)
