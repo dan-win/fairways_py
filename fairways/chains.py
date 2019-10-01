@@ -9,11 +9,12 @@ from .funcflow import FuncFlow as ff
 from .helpers import (get_nested, get_parent, get_lastkey)
 
 class Failure:
-    def __init__(self, exception):
+    def __init__(self, exception, **kwargs):
         self.exception = exception
+        self.details = kwargs
     
     def __str__(self):
-        return f"Chain failure: {self.exception}"
+        return f"Chain failure: {self.exception}; {self.exception!r}; {self.details}"
 
 # TO-DO: move to rust with multiprocessing!
 class Chain:
@@ -95,7 +96,7 @@ class Chain:
             else:
                 ctx = method(ctx)
         except Exception as e:
-            self.failure = Failure(e)
+            self.failure = Failure(e, at=f'method: {method.__name__}; module: {method.__module__}')
             # Return last "successful" ctx
             # return ff.deep_extend(ctx_0)
             return ctx_0

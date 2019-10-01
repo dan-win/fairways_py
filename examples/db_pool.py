@@ -99,6 +99,8 @@ def select_data(ctx, dba=None):
     result = dba.SELECT_DATA.get_records()
     return {"result": result}
 
+def handle_error(err_info):
+    log.error("ERROR: %s", err_info)
 
 def stop(ctx):
     log.info(f"Database operations done: {ctx}")
@@ -107,7 +109,7 @@ def stop(ctx):
 @entrypoint.cli()
 def run(ctx):
     log.debug(f"Running @entrypoint.cron...{__name__}")
-    return Chain(start).then(stop)
+    return Chain(start).catch(handle_error).then(stop)
 
 @entrypoint.qa()
 def test(ctx):
