@@ -26,6 +26,33 @@ class SqLite(AsyncDataDriver, FileConnMixin):
         engine.isolation_level = "IMMEDIATE"
         self.engine = engine
 
+    async def fetch(self, sql):
+        cursor = None
+        try:
+            await self._ensure_connection()
+            cursor = await self.engine.execute(sql)
+            return await cursor.fetchall()
+        except Exception as e:
+            log.error("DB operation error: {} at {}".format(e, self.db_name))
+            raise
+        finally:
+            if cursor:
+                await cursor.close()
+            if self.autoclose:
+                await self.close()
+    
+    async def change(self, sql):
+        try:
+            await self._ensure_connection()
+            await self.engine.execute(sql)
+            await self.engine.commit()
+        except Exception as e:
+            log.error("DB operation error: {} at {}".format(e, self.db_name))
+            raise
+        finally:
+            if self.autoclose:
+                await self.close()
+
 
 def dict_factory(cursor, row):
     d = {}

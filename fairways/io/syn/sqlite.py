@@ -24,7 +24,7 @@ class SqLite(SynDataDriver, FileConnMixin):
         engine.isolation_level = "IMMEDIATE"
         self.engine = engine
 
-    def fetch(self,sql):
+    def fetch(self, sql):
         cursor = None
         try:
             self._ensure_connection()
@@ -36,6 +36,18 @@ class SqLite(SynDataDriver, FileConnMixin):
         finally:
             if cursor:
                 cursor.close()
+            if self.autoclose:
+                self.close()
+    
+    def change(self, sql):
+        try:
+            self._ensure_connection()
+            self.engine.execute(sql)
+            self.engine.commit()
+        except Exception as e:
+            log.error("DB operation error: {} at {}".format(e, self.db_name))
+            raise
+        finally:
             if self.autoclose:
                 self.close()
 

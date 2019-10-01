@@ -24,10 +24,11 @@ class SynDataDriver(DataDriver):
             self.engine.close()
             self.engine = None
 
-    def fetch(self,sql):
+    def fetch(self, sql):
         try:
             self._ensure_connection()
-            with self.engine.execute(sql) as cursor:
+            with self.engine.cursor() as cursor:
+                cursor.execute(sql)
                 return cursor.fetchall()
         except Exception as e:
             log.error("DB operation error: {} at {}".format(e, self.db_name))
@@ -39,8 +40,9 @@ class SynDataDriver(DataDriver):
     def change(self, sql):
         try:
             self._ensure_connection()
-            self.engine.execute(sql)
-            self.engine.commit()
+            with self.engine.cursor() as cursor:
+                self.engine.execute(sql)
+                self.engine.commit()
         except Exception as e:
             log.error("DB operation error: {} at {}; {}".format(e, self.db_name, sql))
             raise

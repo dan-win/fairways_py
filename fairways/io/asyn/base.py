@@ -22,7 +22,7 @@ class AsyncDataDriver(DataDriver):
             await self.engine.close()
             self.engine = None
 
-    async def fetch(self,sql):
+    async def fetch(self, sql):
         try:
             await self._ensure_connection()
             async with self.engine.execute(sql) as cursor:
