@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __all__ = [
+    "set_config_provider",
     "DataDriver",
     "ConnectionPool", 
     "QueriesSet", 
@@ -33,6 +34,9 @@ RE_ENV_EXPRESSION = re.compile(r"\{\$(.*?)\}")
 RE_URI_TEMPLATE = re.compile(r"(?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>.*))?")
 
 UriParts = namedtuple('UriParts', 'scheme,user,password,host,port,path'.split(','))
+
+def set_config_provider(config_dict):
+    return DataDriver.set_config_provider(config_dict)
 
 def replace_env_vars(s):
     """Replace all occurences of {$name} in string with values from os.environ
@@ -288,122 +292,6 @@ class FixtureQuery(BaseQuery):
     def execute(self, *args, **kwargs):
         """ Dummy execute method"""
         log.info("Fake execute: [%s] %s %s", self.name, args, kwargs)
-
-
-
-# class QueriesSetManager:
-    
-#     @property
-#     def active(self):
-#         return self.dba_reg[self.active_profile]
-
-#     def __init__(self):
-#         module = inspect.getmodule(inspect.stack()[1][0])
-#         modname = module.__name__
-#         self.modname = modname
-#         self.dba_reg = {}
-#         self.active_profile = None
-    
-
-#     # -> set_dba
-#     def set_dba(self, dba_class):
-#         if not issubclass(dba_class, QueriesSet):
-#             raise TypeError("DBA class should be descendant of QueriesSet")
-        
-#         profile_name = dba_class.__name__
-#         self._add_dba(profile_name, dba_class)
-#         self.active_profile = profile_name
-
-#     # -> create_dba_from_query_dict
-#     def set_dba_from_query_dict(self, profile_name, **queries):
-#         parents = (QueriesSet, )
-#         for _, query in queries.items():
-#             if isinstance(query, BaseQuery):
-#                 continue
-#             raise TypeError("set_dba requires BaseQuery descendants in values of queries keyword arguments")
-#         db_task_set = type(profile_name, parents, queries)
-#         self._add_dba(profile_name, db_task_set)
-#         self.active_profile = profile_name
-
-#     def add_fixture(self, profile_name, **responses):
-#         dba = self.from_dict(profile_name, item_factory=FixtureQuery, **responses)
-#         self._add_dba(profile_name, dba)
-    
-#     def select_profile(self, profile_name):
-#         """Select DBA profile to activate related DBA in manager instance
-        
-#         Arguments:
-#             profile_name {[type]} -- [description]
-        
-#         Raises:
-#             KeyError: [description]
-        
-#         Returns:
-#             [type] -- [description]
-#         """
-#         found = self.dba_reg.get(profile_name)
-#         if found:
-#             saved = self.active_profile
-#             self.active_profile = profile_name
-#             return saved
-#         raise KeyError("Cannot set profile {} because no such record in a registry".format(profile_name))
-    
-#     @contextmanager
-#     def another_context(self, profile_name):
-#         try:
-#             initial_profile = self.select_profile(profile_name)
-#             yield profile_name
-#         finally:
-#             # Code to release resource, e.g.:
-#             self.select_profile(initial_profile)
-
-#     def _add_dba(self, profile_name, dba):
-#         def apply_names(dba):
-#             for attr_name, attr_value in dba.__dict__.items():
-#                 if isinstance(attr_value, BaseQuery):
-#                     query_obj = attr_value
-#                     setattr(query_obj, "name", attr_name)
-            
-#         if self.dba_reg.get(profile_name):
-#             raise ValueError("DbTaskSetManager: QueriesSet with profile {} already defined for module {}".format(profile_name, self.modname))
-#         apply_names(dba)
-#         self.dba_reg[profile_name] = dba
-    
-
-#     # -> create_dba_from_attr_dict
-#     @staticmethod
-#     def from_dict(name, item_factory=lambda x:x, **items):
-#         attrs_dict = {}
-#         for attr_name, attr_value in items.items():
-#             attrs_dict.update({attr_name: item_factory(attr_value)})
-#         parents = (QueriesSet, )
-#         return type(name, parents, attrs_dict)
-
-#     @staticmethod
-#     def inject_dba_decorator(manager, arg_name="dba"):
-#         """Inject 'db' keyword argument into wrapped function.
-#         Supports dynamic selection of the active QueriesSet immediately upon invocation of wrapped function.
-#         Allows to use fixtures for tests
-        
-#         Arguments:
-#             db {[type]} -- [description]
-        
-#         Returns:
-#             callable -- Wrapped node
-#         """
-#         db = manager.active
-#         # modname = modname.split('.')[-1]
-#         # QueriesSet.set_module_db_taskset(db, modname)
-#         def _decorator(func):
-#             log.debug("@use_db: initial db set: %s", db.__name__)
-#             @functools.wraps(func)
-#             def wrapper(context, **kwargs):
-#                 db = manager.active
-#                 kwargs.update({'dba': db})
-#                 log.debug("Switching DB: %s", db)
-#                 return func(context, **kwargs)
-#             return wrapper
-#         return _decorator
 
 
 class debug(type):

@@ -92,3 +92,5 @@ class HttpQueryParams:
         self.url = kwargs['url']
         self.body = kwargs.get('body', None)
     
+class RedisPopQuery(BaseQuery, ReaderMixin):
+    template_class = str

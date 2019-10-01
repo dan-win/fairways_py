@@ -12,6 +12,8 @@ from fairways.funcflow import FuncFlow as ff
 from fairways.decorators.entrypoint import QA, RegistryItem
 from fairways.decorators.entities import Mark
 
+from fairways.io.generic import set_config_provider
+
 import sys
 import argparse
 import json
@@ -26,6 +28,9 @@ class App:
 
     def __init__(self):
         self.settings = settings
+    
+    def set_config_provider(self):
+        set_config_provider(self.settings.CONNECTIONS)
     
     def start(self):
         parser = argparse.ArgumentParser()
