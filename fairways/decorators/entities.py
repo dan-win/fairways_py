@@ -57,13 +57,12 @@ class Mark:
         if len(missed) > 0:
             raise TypeError("Decorator {} - required args missed: {}".format(self.__class__.__name__, ",".join(missed)))
         self.options = options
-        log.debug('Decorator: %s', self)
+        # log.debug('Decorator: %s', self)
     
     def __str__(self):
         return self.mark_name
 
     def __call__(self, subject):
-        print(f"\n@DECORATOR ->>> {self.mark_name} | {subject.__name__} | {subject.__module__}\n")
         if self.once_per_module and self.__class__.__name__ != Mark.__name__:
             if self.find_module_entity(subject.__module__):
                 raise Exception(f"Mark '{self.mark_name}' alredy defined in module '{subject.__module__}'")

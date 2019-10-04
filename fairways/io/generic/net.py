@@ -6,6 +6,7 @@ import urllib.parse
 
 class HttpQueryTemplate:
 
+    # NOTE: Make more stable solution to create hash (take into account complex cases like "application/json;charset=UTF-8", "text/json, etc."). Use regex to extract "root" part of context type descriptio
     encoders = {
         'application/json': json.dumps,
         'application/x-www-form-urlencoded': lambda d: urllib.parse.urlencode(d, quote_via=urllib.parse.quote)

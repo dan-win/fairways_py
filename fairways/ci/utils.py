@@ -29,3 +29,4 @@ def trace_middleware_factory(log):
         log.info("\nSTEP #{} [{}], data after:\n {!r}".format(kwargs["__step"], method.__name__, result))
         return result
     return trace_middleware
+

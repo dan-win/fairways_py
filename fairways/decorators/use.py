@@ -5,11 +5,14 @@ __all__ = [
 ]
 
 import os
+import sys
 import functools
 
 from fairways.funcflow import FuncFlow as ff
 
 from .connection import DefineConnections
+
+from . import entrypoint
 
 # from ..io import DbTaskSetManager
 # dba = DbTaskSetManager.inject_dba_decorator
@@ -62,4 +65,20 @@ def connection(arg_name):
             kwargs.update({arg_name: entity.subject})
             return func(context, **kwargs)
         return wrapper
+    return decorator
+
+
+def config(config_key):
+    def decorator(func):
+        func = entrypoint.conf(config_key=config_key)(func)
+        global_conf_module = sys.modules.get('fairways.conf')
+        if global_conf_module: 
+            settings = global_conf_module.settings
+            if settings:
+                sub_conf = getattr(settings, config_key)
+                try:
+                    func(sub_conf)
+                except Exception as e:
+                    log.error(f"Error during conf loading for {module_name}: {e!r}")
+        return func
     return decorator

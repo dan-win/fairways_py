@@ -8,6 +8,11 @@ from fairways.ci.utils import csv2py
 from fairways.funcflow import FuncFlow as ff
 from fairways.decorators.entrypoint import QA
 
+from fairways import conf
+from fairways import log
+
+import logging
+
 def setUpModule():
     pass
 
@@ -18,15 +23,14 @@ class FixtureTestTemplate(unittest.TestCase):
     subject_module = ""
     fixture = {}
 
-    @classmethod
-    def setUpClass(cls):
+    # @classmethod
+    def setUp(cls):
         # from ci import fakedb
         # import json
         # import os
         import importlib
         cls.module_to_test = importlib.import_module(cls.subject_module)
         cls.modname = cls.module_to_test.__name__
-        import logging
         log = logging.getLogger(__name__)
         cls.log = log
 
@@ -39,7 +43,7 @@ class FixtureTestTemplate(unittest.TestCase):
         import unittest.mock
 
     
-    def get_response_with_fixture(self):
+    def get_response_with_fixture(self, fixture_dict=None, middleware=None):
         """
         Call this method to run actual test
         """
@@ -53,11 +57,12 @@ class FixtureTestTemplate(unittest.TestCase):
 
         module_conn = decorators.connection.define.find_module_entity(self.modname)
         fixture_name = f"{self.subject_module}_fixture_queries_set".upper()
-        fixture_queriesset = QueriesSet.from_fixtures_dict(fixture_name, **self.fixture)
+        fixture_dict = fixture_dict or self.fixture
+        fixture_queriesset = QueriesSet.from_fixtures_dict(fixture_name, **fixture_dict)
 
         with unittest.mock.patch.object(module_conn, "subject", fixture_queriesset):
             ctx = {}
-            result = entry.handler(ctx)
+            result = entry.handler(ctx, middleware)
         
         return result
 

@@ -54,20 +54,6 @@ class Chain:
         middleware = middleware_items or inherited_middleware
         self.middleware(*middleware)
         self.step = step
-
-    # def __del__(self):
-    #     try:
-    #         self.ctx = None
-    #         self.middleware = None
-    #     except:
-    #         pass
-
-    # def next_chain(self, ctx):
-    #     middleware = self.middleware[:]
-    #     c = Chain(ctx)
-    #     c.step = self.step + 1
-    #     c.failure = self.failure
-    #     return c
     
     def middleware(self, *items):
         """Install middleware for subsequent nodes of chain.
@@ -213,4 +199,7 @@ class Chain:
         """
         return ff.deep_extend(self.ctx)
 
+
+class SkipFollowing(Exception):
+    "Just skip next steps of chain"
 

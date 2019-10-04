@@ -4,7 +4,17 @@ import os, re
 import logging
 import logging.config
 
-from fairways.conf import settings
+# from fairways.conf import settings
+from fairways.decorators import use
+
+CONF_KEY = "LOGGING"
+
+@use.config(CONF_KEY)
+def set_conf(logging_conf):
+    if not logging_conf:
+        logging_conf = DEFAULT_CONF
+    logging.config.dictConfig(logging_conf)
+
 
 DEFAULT_CONF = {
     'version': 1,
@@ -39,7 +49,7 @@ DEFAULT_CONF = {
 
     "formatters": {
         "standard": {
-            "format": "%(log_color)s%(levelname)-8s%(reset)s %(log_color)s%(message)s"
+            "format": "%(levelname)-8s %(asctime)s %(message)s"
         },
         "color": {
             "()": "fairways.helpers.ColoredFormatterFactory",
@@ -70,10 +80,4 @@ DEFAULT_CONF = {
 }
 
 
-def init():
-    logging_conf = getattr(settings, "LOGGING", DEFAULT_CONF)
-    user_conf = DEFAULT_CONF.copy()
-    user_conf.update(logging_conf)
-    logging.config.dictConfig(user_conf)
-
-# init_loggers()
+# logging.config.dictConfig(DEFAULT_CONF)

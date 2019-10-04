@@ -22,11 +22,16 @@ from contextlib import contextmanager
 from typing import (List, Dict)
 from collections import namedtuple
 
+from fairways.decorators import use
+
 import logging
 log = logging.getLogger(__name__)
 
 import os
+import sys
 import re
+
+CONF_KEY = "CONNECTIONS"
 
 RE_ENV_EXPRESSION = re.compile(r"\{\$(.*?)\}")
 # RE_URI_TEMPLATE = re.compile(r"(.*?)://(.*?):(.*?)@(.*?):(.*?)/(.*)")
@@ -35,8 +40,16 @@ RE_URI_TEMPLATE = re.compile(r"(?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password
 
 UriParts = namedtuple('UriParts', 'scheme,user,password,host,port,path'.split(','))
 
+# this is a pointer to the module object instance itself.
+this = sys.modules[__name__]
+this._config_provider = os.environ
+
+@use.config(CONF_KEY)
 def set_config_provider(config_dict):
-    return DataDriver.set_config_provider(config_dict)
+    prev_value = this._config_provider
+    if config_dict:
+        this._config_provider = config_dict
+    return prev_value
 
 def replace_env_vars(s):
     """Replace all occurences of {$name} in string with values from os.environ
@@ -129,7 +142,8 @@ class DataDriver:
         Arguments:
             env_varname {str} -- Name of enviromnent variable which holds connection string (e.g.: "mysql://user@pass@host/db")
         """
-        conn_uri_raw = self._config_provider.get(env_varname, self.default_conn_str)
+        # "this" points to this module here, see above
+        conn_uri_raw = this._config_provider.get(env_varname, self.default_conn_str)
         conn_uri = replace_env_vars(conn_uri_raw)
         self.conn_str = conn_uri
         # Used from mixin:
@@ -250,7 +264,7 @@ class ReaderMixin:
 
         connection = ConnectionPool.select(self.driver, self.connection_alias)
         try:
-            log.debug(f"TRACE QUERY: {self.driver} | {self.connection_alias} | {self.template} ")
+            # log.debug(f"TRACE QUERY: {self.driver} | {self.connection_alias} | {self.template} ")
             return connection.get_records(self.template, **params)
         except Exception as e:
             log.error("Error with DB read: {!r}; SQL: {}".format(e, self.template))
@@ -274,7 +288,7 @@ class WriterMixin:
 
         connection = ConnectionPool.select(self.driver, self.connection_alias)
         try:
-            log.debug(f"TRACE QUERY: {self.driver} | {self.connection_alias} | {self.template} ")
+            # log.debug(f"TRACE QUERY: {self.driver} | {self.connection_alias} | {self.template} ")
             return connection.execute(self.template, **params)
         except Exception as e:
             log.error("Error with DB write: {!r}; SQL: {}".format(e, self.template))
@@ -282,8 +296,9 @@ class WriterMixin:
 
 
 class FixtureQuery(BaseQuery):
-    def __init__(self, response_dict):
+    def __init__(self, response_dict, name=None):
         self.response_dict = response_dict
+        self.name = name
     
     def get_records(self, **sql_params):
         """ Return fixture data to simulate DB response"""
@@ -291,7 +306,7 @@ class FixtureQuery(BaseQuery):
     
     def execute(self, *args, **kwargs):
         """ Dummy execute method"""
-        log.info("Fake execute: [%s] %s %s", self.name, args, kwargs)
+        log.info("Fake execute %s: %s %s", self.name, args, kwargs)
 
 
 class debug(type):
@@ -319,6 +334,9 @@ class QueriesSet(metaclass=debug):
     def from_fixtures_dict(cls, name, item_factory=FixtureQuery, **items):
         attrs_dict = {}
         for attr_name, attr_value in items.items():
-            attrs_dict.update({attr_name: item_factory(attr_value)})
+            attrs_dict.update({attr_name: item_factory(attr_value, attr_name)})
         parents = (cls, )
         return type(name, parents, attrs_dict)
+    
+    def __init__(self):
+        raise TypeError("You do not need to instantiate QueriesSet and its subclasses!")

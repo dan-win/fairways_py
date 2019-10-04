@@ -56,3 +56,13 @@ class Http(Channel):
 class QA(Channel):
     mark_name = "qa"
 
+
+@register_decorator
+class ConfigHandler(Channel):
+    mark_name = "conf"
+    decorator_kwargs = ["config_key"]
+    decorator_required_kwargs = ["config_key"]
+
+    # Sometimes we need to use several config keys in one module:
+    once_per_module = False
+
