@@ -31,7 +31,12 @@ class FixtureTestTemplate(unittest.TestCase):
         import importlib
         cls.module_to_test = importlib.import_module(cls.subject_module)
         cls.modname = cls.module_to_test.__name__
-        log = logging.getLogger(__name__)
+
+        from fairways import log
+        from fairways.conf import load
+        load(None)
+        import logging
+        log = logging.getLogger()
         cls.log = log
 
         from fairways.io import generic as io_generic 
@@ -62,7 +67,7 @@ class FixtureTestTemplate(unittest.TestCase):
 
         with unittest.mock.patch.object(module_conn, "subject", fixture_queriesset):
             ctx = {}
-            result = entry.handler(ctx, middleware)
+            result = entry.handler(ctx, middleware=middleware)
         
         return result
 

@@ -15,7 +15,10 @@ settings = None
 this = sys.modules[__name__]
 
 def load(source):
-    if isinstance(source, str):
+    if source is None:
+        # force to load defaults:
+        this.settings = {}
+    elif isinstance(source, str):
         # Module name:
         dynload.import_module(source)
         this.settings = sys.modules[source]
@@ -30,7 +33,7 @@ def load(source):
     for record in ConfigHandler.items():
         handler = record.handler
         key = record.meta["config_key"]
-        sub_conf = getattr(settings, key)
+        sub_conf = getattr(settings, key, None)
         try:
             handler(sub_conf)
         except Exception as e:

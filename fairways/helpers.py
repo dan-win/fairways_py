@@ -8,9 +8,30 @@ def get_nested(d, path, delimiter="/"):
     def item_by_tag(d, tags):
         # print(">>>>>>>>>>>>>> running nested", d, tags)
         t = tags[-1]
+        child = d[t]
         if len(tags) == 1:
-            return d[t]
-        return item_by_tag(d[t], tags[:-1])
+            return child
+        return item_by_tag(child, tags[:-1])
+
+    tags = path.split(delimiter)
+    tags.reverse()
+    # print(">>>>>>>>>>>>>> splitted", tags)
+    return item_by_tag(d, tags)
+
+def get_nested_default(d, path, delimiter="/", default=None):
+    """
+    Address nested dicts via combined path
+    """
+    def item_by_tag(d, tags):
+        # print(">>>>>>>>>>>>>> running nested", d, tags)
+        t = tags[-1]
+        try:
+            child = d[t]
+        except:
+            return default
+        if len(tags) == 1:
+            return child
+        return item_by_tag(child, tags[:-1])
 
     tags = path.split(delimiter)
     tags.reverse()
@@ -44,4 +65,5 @@ def rows2dict(r, key_attr=None, value_attr=None):
 def ColoredFormatterFactory(**kwargs):
     format_template = kwargs.pop("format_template")
     from colorlog import ColoredFormatter
+    print("^^^^^^^^^^^^^^^^^^^^^^ ColoredFormatterFactory", ColoredFormatter)
     return ColoredFormatter(format_template, **kwargs)

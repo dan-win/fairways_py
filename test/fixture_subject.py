@@ -20,6 +20,6 @@ def some_task(ctx, dba=None, unused_arg=None):
     return dba.QUERY1.get_records()
 
 @decorators.entrypoint.qa()
-def runner(ctx):
+def runner(ctx, middleware=None):
     return some_task(ctx)
 

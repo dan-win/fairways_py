@@ -13,6 +13,7 @@ CONF_KEY = "LOGGING"
 def set_conf(logging_conf):
     if not logging_conf:
         logging_conf = DEFAULT_CONF
+        print('LOADING DEFAULT !!!!!!!!!!!!!!!!!!!!')
     logging.config.dictConfig(logging_conf)
 
 
@@ -23,7 +24,7 @@ DEFAULT_CONF = {
         "console": {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
-            'formatter': 'standard'            
+            'formatter': 'color'            
         },
         "rmq": {
 			'level': 'DEBUG',

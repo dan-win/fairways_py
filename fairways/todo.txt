@@ -10,3 +10,15 @@ Chains as "lazy" computations.
 asyncmethod decorators - handle exceptions inside decorated func!
 
 "features", "flavors" - separate dependencies from 3rd-party packs (redis, ...)
+
+
+Query.get_records - method which always returns list or raises error
+Query.get_response - mode generic method, returns named tuple {response, error, data - list or object}
+TRANSPORT MEDIA MESSAGE SHOULD BE ONE TYPE FOR ALL TRANSPORTS!
+class Message:
+    result
+    error
+    payload
+Chains: move Failure state from step into message?
+Chains should be last - it builds array of deferred methods,
+where result computed only after consumption. override right equal __eq.....???
