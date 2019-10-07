@@ -1,6 +1,53 @@
 # -*- coding: utf-8 -*-
+"""
+These functions are ported (with some modifications) from Underscore.js: https://underscorejs.org
+"""
+
+import copy
+import collections
 
 class FuncFlow(object):
+
+    @staticmethod
+    def deep_extend(*args):
+        """
+        Deep copy of each item ("extend" makes swallow copy!)
+        """
+
+        def clone_obj(item):
+            if isinstance(item, collections.Mapping):
+                return dict(**item)
+            if isinstance(item, (list, tuple)):
+                return list(item)
+            return None
+
+        def iterator(item, i, iterable):
+            obj = clone_obj(item)
+            if obj is None:
+                iterable[i] = item
+            else:
+                if isinstance(obj, collections.Mapping):
+                    iterable[i] = FuncFlow.deep_extend({}, obj)
+                elif isinstance(obj, (list, tuple)):
+                    FuncFlow.each(obj, iterator)
+                    iterable[i] = obj
+                else:
+                    raise TypeError("deep_copy cannot handle this type: {}".format(type(obj)))
+            
+        args = list(args)
+        dest = args.pop(0)
+
+        for source in args:
+            if source:
+                for k, v in source.items():
+                    obj = clone_obj(v)
+                    if obj is None:
+                        dest[k] = v
+                    else:
+                        FuncFlow.each(obj, iterator)
+                        dest[k] = obj
+        return dest
+
     @staticmethod
     def uniq(iterable):
         if iterable is None: return None
@@ -19,12 +66,18 @@ class FuncFlow(object):
 
     @staticmethod
     def extend(*args):
-        args = list(args)
-        dest = args.pop(0)
-        for source in args:
-            if source:
-                dest.update(source)
-        return dest
+        # Note: Always use deep_extend. It returns correct result when structures becomes nested:)
+        return FuncFlow.deep_extend(*args)
+        # args = list(args)
+        # dest = args.pop(0)
+        # for source in args:
+        #     if source:
+        #         dest.update(source)
+        # return dest
+
+    @staticmethod
+    def weld(*args):
+        return FuncFlow.deep_extend({}, *args)
 
     @staticmethod
     def omit(data, *keys):
@@ -62,7 +115,7 @@ class FuncFlow(object):
     @staticmethod
     def every(iterable, iterfunc):
         if iterable is None: return None
-        return reduce(iterable, lambda v: bool(iterfunc(v)), true)
+        return FuncFlow.reduce(iterable, lambda memo, v: memo and bool(iterfunc(v)), True)
 
     @staticmethod
     def find(iterable, iterfunc):
@@ -73,7 +126,7 @@ class FuncFlow(object):
         return None
 
     @staticmethod
-    def find_where(iterable, properties):
+    def find_where(iterable, **properties):
         if iterable is None: return None
         result = []
         for item in iterable:
@@ -98,7 +151,7 @@ class FuncFlow(object):
         if isinstance(iteratee, str):
             attrname = iteratee
             method = lambda v: v[attrname]
-        elif iterfunc(iteratee):
+        elif callable(iteratee):
             method = iteratee
         else:
             raise TypeError()
@@ -145,45 +198,10 @@ class FuncFlow(object):
     @staticmethod
     def size(iterable):
         return len(list(iterable))
-
+    
     @staticmethod
-    def deep_extend(*args):
-        """
-        Deep copy of each item ("extend" makes swallow copy!)
-        """
-        def clone_obj(item):
-            if isinstance(item, dict):
-                return dict(**item)
-            if isinstance(item, (list, tuple)):
-                return list(item)
-            return None
-
-        def iterator(item, i, iterable):
-            obj = clone_obj(item)
-            if obj is None:
-                iterable[i] = item
-            else:
-                if isinstance(obj, dict):
-                    iterable[i] = deep_extend({}, obj)
-                elif isinstance(obj, (list, tuple)):
-                    FuncFlow.each(obj, iterator)
-                    iterable[i] = obj
-                else:
-                    raise TypeError("deep_copy cannot handle this type: {}".format(type(obj)))
-            
-        args = list(args)
-        dest = args.pop(0)
-
-        for source in args:
-            if source:
-                for k, v in source.items():
-                    obj = clone_obj(v)
-                    if obj is None:
-                        dest[k] = v
-                    else:
-                        FuncFlow.each(obj, iterator)
-                        dest[k] = obj
-        return dest
+    def copy(iterable):
+        return copy.deepcopy(iterable)
 
     @staticmethod
     def apply(object, func):
@@ -243,76 +261,4 @@ def _align_type(data):
     else:
         return list(data)
 
-
-#################
-# def dumpjson(fname):
-#     fpath = os.path.join(dump_path, fname)
-#     def writer(data):
-#         with open(fpath, 'wb') as f:
-#             f.write(json.dumps(data, ensure_ascii=False).encode('utf8'))
-#     return writer
-#################
-
-
-if __name__ == '__main__':
-
-    _ = FuncFlow
-
-    data = [
-        {'id': 11, 'data': 'test1', 'tag': 'a'},
-        {'id': 12, 'data': 'test2', 'tag': 'a'},
-        {'id': 13, 'data': 'test3', 'tag': 'b'},
-        {'id': 14, 'data': 'test3', 'tag': 'b'},
-        {'id': 15, 'data': 'test3', 'tag': 'c'},
-        {'id': 16, 'data': 'test3', 'tag': 'f'},
-    ]
-
-    def dumper():
-        def wrapper(data):
-            print('DUMP:', data)
-        return wrapper
-    
-    test = Chain(data).sort_by(lambda v: -v['id']).saveto(dumper()).value
-
-    stooges = [{'name': 'moe', 'age': 40}, {'name': 'larry', 'age': 50}, {'name': 'curly', 'age': 60}]
-    print('pluck: ', _.pluck(stooges, 'name'))
-
-    print("=============")
-
-    test = _.find_where(data, {
-        'data': 'test3',
-    })
-
-    print("=============")
-    print(test)
-    print("=============")
-
-    test = _.find_where(data, {
-        'data': 'test3',
-        'tag': 'f'
-    })
-
-    print("=============")
-    print(test)
-    print("=============")
-
-    test = _.map(data, lambda d: "{}+{}".format(d['data'], d['tag']))
-
-    print("=============")
-    print(test)
-    print("=============")
-
-    test = _.size([1,2,3])
-
-    print("=============")
-    print(test)
-    print("=============")
-
-    test = _.chain([1,2,3]).size().value
-
-    print("=============")
-    print(test)
-    print("=============")
-
-    # print(test)
 

@@ -329,6 +329,54 @@ class TaskFlowTestCase(unittest.TestCase):
         self.assertEqual(result, [1, 2, 'always'])
         self.assertEqual(error_trace, ['catched'])
 
+    def test_catch_able_to_replace_envelope_after_exception(self):
+        Chain = self.Chain
+
+        error_trace = []
+        arg = []
+
+        def step1(arg):
+            return arg + [1]
+
+        def step2(arg):
+            return arg + [2]
+
+        def step_with_exception_zero_division(arg):
+            1/0
+            return arg + [3]
+
+        def step_with_exception_key_error(arg):
+            {}["Key"]
+            return arg + [4]
+
+        def handle_error(error):
+            arg = error.data_before_failure
+            self.log.warning(f">>>>>>>>>>>>>>> Triggered: handle_error: {error}")
+            error_trace.append("catched")
+            return arg + ['recovered']
+
+        def step4(arg):
+            return arg + ["always"]
+
+        chain = Chain(
+            ).then(
+                step1
+            ).then(
+                step2
+            ).then(
+                step_with_exception_zero_division
+            ).catch_on(
+                ZeroDivisionError,
+                handle_error
+            ).then(
+                step4
+            )
+
+        result = chain(arg)
+
+        self.assertEqual(result, [1, 2, 'recovered', 'always'])
+        self.assertEqual(error_trace, ['catched'])
+
 
     def test_catch_on_should_ignore_other_error(self):
         Chain = self.Chain
