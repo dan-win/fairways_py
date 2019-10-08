@@ -133,7 +133,7 @@ class Chain:
                 data_before_failure = ff.copy(envelope.state[Envelope.DATA_ROOT])
                 failure = Failure(e, data_before_failure)
                 envelope.set_failure({e.__class__.__name__: failure})
-                log.warning(f"[E] Running '{method.__name__}'; topic: '{topic}'; envelope: {envelope.state}")
+                log.debug(f"[E] Running '{method.__name__}'; topic: '{topic}'; envelope: {envelope.state}")
 
         return envelope.get_data()
         
