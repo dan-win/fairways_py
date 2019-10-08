@@ -257,9 +257,13 @@ class TaskFlowTestCase(unittest.TestCase):
             1/0
             return arg + [3]
         
-        def handle_error(error):
-            self.log.warning(f">>>>>>>>>>>>>>> Triggered: handle_error: {error}")
+        def handle_error(err_info):
+            extype, failure = err_info.popitem()
+            self.log.warning(f">>>>>>>>>>>>>>> Triggered: handle_error: {err_info}")
             error_trace.append("catched")
+            data_before_failure = failure.data_before_failure
+            data_before_failure += [extype]
+            return data_before_failure
 
         def step4(arg):
             return arg + ["always"]
@@ -279,7 +283,7 @@ class TaskFlowTestCase(unittest.TestCase):
 
         result = chain(arg)
 
-        self.assertEqual(result, [1, 2, 'always'])
+        self.assertEqual(result, [1, 2, 'ZeroDivisionError', 'always'])
         self.assertEqual(error_trace, ['catched'])
 
 

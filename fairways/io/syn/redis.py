@@ -3,7 +3,7 @@
 import redis
 import os
 import re
-
+import json 
 from .base import (SynDataDriver, UriConnMixin)
 
 import logging
@@ -14,16 +14,26 @@ class Redis(SynDataDriver, UriConnMixin):
     autoclose = False
     default_conn_str = 'localhost:6379'
 
-    # def __init__(self, env_varname='REDIS_ADDRESS', default='localhost:6379'):
-    #     redis_host, redis_port = os.getenv(env_varname, default).split(":")
-    #     self.engine = redis.StrictRedis(host=redis_host, port=int(redis_port), db=0)
-
     def is_connected(self):
         return self.engine
     
     def _connect(self):
-        redis_host, redis_port = os.getenv(env_varname, default).split(":")
+        redis_host, redis_port = self.uri_parts.host, self.uri_parts.port
+        # uri parts
         self.engine = redis.StrictRedis(host=redis_host, port=int(redis_port), db=0)
+
+    def get_records(self, data_key, **params):
+        self._ensure_connection()
+        records = []
+        # Data exist in multiple chunks, so join them together by enumeration:
+        chunk = self.engine.rpop(data_key)
+        if chunk:
+            rec = chunk.decode()
+            memdata = json.loads(rec)
+            for event in memdata:
+                records.append(event)
+
+        return records
 
 
 class RedisStack(Redis):
@@ -33,7 +43,7 @@ class RedisStack(Redis):
     """
 
     def get_records(self, data_key, **params):
-
+        self._ensure_connection()
         records = []
         # Data exist in multiple chunks, so join them together by enumeration:
         while True:
