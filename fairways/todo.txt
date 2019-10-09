@@ -22,3 +22,8 @@ class Message:
 Chains: move Failure state from step into message?
 Chains should be last - it builds array of deferred methods,
 where result computed only after consumption. override right equal __eq.....???
+
+===
+amqp ... chain 
+graphana?
+

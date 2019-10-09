@@ -56,6 +56,14 @@ class Envelope:
         return self.getval(self.FAILURE_ROOT)
 
     def set_failure(self, failure):
+        """Set failure state
+        
+        Arguments:
+            failure {Failure} -- Failure class instance
+        
+        Raises:
+            ValueError: Protects from setting failure to None
+        """
         if failure is None:
             raise ValueError("set_failure cannot accept None")
         self.state[self.DATA_STACK], self.state[self.DATA_ROOT] = self.state[self.DATA_ROOT], None
@@ -67,6 +75,11 @@ class Envelope:
 
     @property    
     def isfailure(self):
+        """Whether is failure state now
+        
+        Returns:
+            bool -- True when failure state
+        """
         return self.state[self.FAILURE_ROOT] is not None
 
 

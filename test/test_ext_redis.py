@@ -8,7 +8,8 @@ def tearDownModule():
     pass
 
 class RedisPublishConsumeTestCase(unittest.TestCase):
-    conn_str = "redis://localhost:6370"
+    # conn_str = "redis://localhost:6370"
+    conn_str = "unix:///home/dmitriy/docker-sockets/atacama_cache/redis.sock"
 
     # @classmethod
     # def clean_test_db(cls):

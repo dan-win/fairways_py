@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, re
 import types
 
 from fairways.decorators.entrypoint import ConfigHandler
@@ -28,6 +28,8 @@ def load(source):
         this.settings = source
     else:
         raise TypeError(f"conf.load cannot load settings from such type: '{source}'")
+
+    # Replace env vars in values:
     
     # Load entrypoints:
     for record in ConfigHandler.items():
@@ -46,3 +48,32 @@ def load(source):
 
 # settings = sys.modules[SETTINGS_MODULE]
 
+RE_ENV_EXPRESSION = re.compile(r"\{\$(.*?)\}")
+
+def replace_env_vars(s):
+    """Replace all occurences of {$name} in string with values from os.environ
+    
+    Arguments:
+        s {[str]} -- [description]
+    
+    Returns:
+        [str] -- [String with replaced values]
+    """
+    def envrepl(match):
+        (env_var,) = match.groups(1)
+        return os.environ[env_var]
+
+    return RE_ENV_EXPRESSION.sub(envrepl, s)
+
+def parse_conf_nodes(settings_node):
+    if isinstance(settings_node, dict):
+        return ff.map(settings_node, lambda k, v: replace_env_vars(v) if isinstance(v, str) else v)
+    raise TypeError("Types except dict are not supported now!")
+    # if isinstance(settings_node, types.ModuleType):
+    #     for attr_name in ff.filter(dir(settings_node), lambda name: not name.startswith("_")):
+    #         att_val = getattr()
+    # if isinstance(settings_node, (list, tuple)):
+    #     for item in settings_node:
+    #         if isinstance(item, str):
+                
+    

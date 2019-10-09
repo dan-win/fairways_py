@@ -143,6 +143,8 @@ class FuncFlow(object):
     @staticmethod
     def map(iterable, iterfunc):
         if iterable is None: return None
+        if isinstance(iterable, dict):
+            return {k:iterfunc(v, k) for k, v in iterable.items()}
         return [iterfunc(item) for item in iterable]
 
     @staticmethod

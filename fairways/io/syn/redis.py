@@ -12,15 +12,20 @@ log = logging.getLogger(__name__)
 
 class Redis(SynDataDriver, UriConnMixin):
     autoclose = False
-    default_conn_str = 'localhost:6379'
+    default_conn_str = 'redis://localhost:6379'
 
     def is_connected(self):
         return self.engine
     
     def _connect(self):
-        redis_host, redis_port = self.uri_parts.host, self.uri_parts.port
-        # uri parts
-        self.engine = redis.StrictRedis(host=redis_host, port=int(redis_port), db=0)
+        if self.uri_parts.scheme and self.uri_parts.scheme.endswith("unix://"):
+            # Use unix socket:
+            unix_socket_path = self.uri_parts.host
+            self.engine = redis.StrictRedis(unix_socket_path=unix_socket_path, db=0)
+        else:
+            redis_host, redis_port = self.uri_parts.host, self.uri_parts.port
+            # Use network connection:
+            self.engine = redis.StrictRedis(host=redis_host, port=int(redis_port), db=0)
 
     def get_records(self, data_key, **params):
         self._ensure_connection()

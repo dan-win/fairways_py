@@ -24,6 +24,8 @@ from collections import namedtuple
 
 from fairways.decorators import use
 
+from fairways.conf import replace_env_vars
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ import re
 
 CONF_KEY = "CONNECTIONS"
 
-RE_ENV_EXPRESSION = re.compile(r"\{\$(.*?)\}")
+# RE_ENV_EXPRESSION = re.compile(r"\{\$(.*?)\}")
 # RE_URI_TEMPLATE = re.compile(r"(.*?)://(.*?):(.*?)@(.*?):(.*?)/(.*)")
 # RE_URI_TEMPLATE = re.compile(r"(.*?)://(.*?):(.*?)@(.*?):(.*?)/(.*)")
 RE_URI_TEMPLATE = re.compile(r"(?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>.*))?")
@@ -51,20 +53,20 @@ def set_config_provider(config_dict):
         this._config_provider = config_dict
     return prev_value
 
-def replace_env_vars(s):
-    """Replace all occurences of {$name} in string with values from os.environ
+# def replace_env_vars(s):
+#     """Replace all occurences of {$name} in string with values from os.environ
     
-    Arguments:
-        s {[str]} -- [description]
+#     Arguments:
+#         s {[str]} -- [description]
     
-    Returns:
-        [str] -- [String with replaced values]
-    """
-    def envrepl(match):
-        (env_var,) = match.groups(1)
-        return os.environ[env_var]
+#     Returns:
+#         [str] -- [String with replaced values]
+#     """
+#     def envrepl(match):
+#         (env_var,) = match.groups(1)
+#         return os.environ[env_var]
 
-    return RE_ENV_EXPRESSION.sub(envrepl, s)
+#     return RE_ENV_EXPRESSION.sub(envrepl, s)
 
 def parse_conn_uri(s):
     """Split uri to parts:
