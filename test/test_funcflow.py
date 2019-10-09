@@ -181,9 +181,12 @@ class FuncFlowTestCase(unittest.TestCase):
         """
         """
         ff = self.FuncFlow
-        result = ff.map([1, 2, 3, 4, 5, 6], lambda num: num * 2)
 
-        self.assertEqual(result, [2, 4, 6, 8, 10, 12])
+        result = ff.map([1, 2, 3, 4, 5, 6], lambda num: num * 2)
+        self.assertEqual(result, [2, 4, 6, 8, 10, 12], "Should operate with lists")
+
+        result = ff.map({"a":1, "b":2, "c":3, "d":4, "e":5, "f":6}, lambda num, key: num * 2)
+        self.assertEqual(result, {"a":2, "b":4, "c":6, "d":8, "e":10, "f":12}, "Should operate with lists")
 
     def test_group_by(self):
         """

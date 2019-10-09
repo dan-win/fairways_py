@@ -67,7 +67,7 @@ def replace_env_vars(s):
 
 def parse_conf_nodes(settings_node):
     if isinstance(settings_node, dict):
-        return ff.map(settings_node, lambda k, v: replace_env_vars(v) if isinstance(v, str) else v)
+        return ff.map(settings_node, lambda v, k: replace_env_vars(v) if isinstance(v, str) else v)
     raise TypeError("Types except dict are not supported now!")
     # if isinstance(settings_node, types.ModuleType):
     #     for attr_name in ff.filter(dir(settings_node), lambda name: not name.startswith("_")):
