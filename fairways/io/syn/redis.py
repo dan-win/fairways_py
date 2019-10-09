@@ -18,9 +18,9 @@ class Redis(SynDataDriver, UriConnMixin):
         return self.engine
     
     def _connect(self):
-        if self.uri_parts.scheme and self.uri_parts.scheme.endswith("unix://"):
+        if self.uri_parts.scheme and self.uri_parts.scheme.endswith("unix"):
             # Use unix socket:
-            unix_socket_path = self.uri_parts.host
+            unix_socket_path = "/".join([self.uri_parts.host, self.uri_parts.path])
             self.engine = redis.StrictRedis(unix_socket_path=unix_socket_path, db=0)
         else:
             redis_host, redis_port = self.uri_parts.host, self.uri_parts.port
