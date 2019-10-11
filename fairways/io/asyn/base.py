@@ -37,8 +37,8 @@ class AsyncDataDriver(DataDriver):
     async def change(self, sql):
         try:
             await self._ensure_connection()
-            await self.engine.execute(sql)
-            log.debug("EXECUTING...........")
+            async with self.engine.cursor() as cursor:
+                await cursor.execute(sql)
             await self.engine.commit()
         except Exception as e:
             log.error("DB operation error: {} at {}; {}".format(e, self.db_name, sql))

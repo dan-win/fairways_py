@@ -41,8 +41,8 @@ class SynDataDriver(DataDriver):
         try:
             self._ensure_connection()
             with self.engine.cursor() as cursor:
-                self.engine.execute(sql)
-                self.engine.commit()
+                cursor.execute(sql)
+            self.engine.commit()
         except Exception as e:
             log.error("DB operation error: {} at {}; {}".format(e, self.db_name, sql))
             raise

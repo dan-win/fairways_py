@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from .base import (BaseQuery, ReaderMixin, WriterMixin)
+from fairways.funcflow import FuncFlow as ff
 
 class SqlQuery(BaseQuery, ReaderMixin, WriterMixin):
     template_class = str
@@ -21,7 +22,7 @@ class SqlQuery(BaseQuery, ReaderMixin, WriterMixin):
             if isinstance(value, (set, map, type({}.keys()))):
                 value = list(value)
             if isinstance(value, (list, tuple)):
-                s = ",".join(_.map(value, fmt_item))
+                s = ",".join(ff.map(value, fmt_item))
                 if nested:
                     return "({})".format(s)
                 return s
@@ -179,7 +180,7 @@ class SqlQuery(BaseQuery, ReaderMixin, WriterMixin):
 #             if isinstance(value, (set, map, type({}.keys()))):
 #                 value = list(value)
 #             if isinstance(value, (list, tuple)):
-#                 s = ",".join(_.map(value, fmt_item))
+#                 s = ",".join(ff.map(value, fmt_item))
 #                 if nested:
 #                     return "({})".format(s)
 #                 return s
@@ -248,7 +249,7 @@ class SqlQuery(BaseQuery, ReaderMixin, WriterMixin):
 #     # -> create_dba_from_query_dict
 #     def set_dba_from_query_dict(self, profile_name, **queries):
 #         parents = (QueriesSet, )
-#         for _, query in queries.items():
+#         for ff, query in queries.items():
 #             if isinstance(query, BaseQuery):
 #                 continue
 #             raise TypeError("set_dba requires BaseQuery descendants in values of queries keyword arguments")
