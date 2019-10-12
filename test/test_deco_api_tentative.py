@@ -7,13 +7,13 @@ def setUpModule():
 def tearDownModule():
     pass
 
-class TentativeTestCase(unittest.TestCase):
+class ApiTagTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        from fairways.decorators import tentative
+        from fairways.decorators import apitag
         from fairways.ci import helpers
-        cls.tentative = tentative
+        cls.apitag = apitag
         root = helpers.getLogger()
 
     @classmethod
@@ -21,8 +21,8 @@ class TentativeTestCase(unittest.TestCase):
         pass
 
     def test_tentative(self):
-        tentative = self.tentative
-        @tentative.tentative("to-do:...")
+        apitag = self.apitag
+        @apitag.tentative("to-do:...")
         def temporary():
             "Some draft func"
             pass
