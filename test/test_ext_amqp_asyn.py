@@ -7,7 +7,7 @@ def setUpModule():
 def tearDownModule():
     pass
 
-class AmqpPublishConsumeTestCase(unittest.TestCase):
+class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
     conn_str = "amqp://fairways:fairways@localhost:5672/%2f"
 
     # @classmethod
@@ -81,3 +81,4 @@ class AmqpPublishConsumeTestCase(unittest.TestCase):
             result = self.helpers.run_asyn(consumer.get_records())
 
         self.assertEqual(result.body, b'MY MESSAGE')
+

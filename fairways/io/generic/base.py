@@ -11,6 +11,7 @@ __all__ = [
     "FixtureQuery",
     "UriConnMixin",
     "FileConnMixin",
+    "UriParts"
 ]
 
 """High-level entities

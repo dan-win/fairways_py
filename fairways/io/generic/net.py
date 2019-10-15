@@ -75,6 +75,7 @@ class HttpQueryTemplate:
         return rq_kwargs
 
 
+
 class HttpQuery(BaseQuery, ReaderMixin, WriterMixin):
     template_class = HttpQueryTemplate
     
@@ -95,3 +96,81 @@ class HttpQueryParams:
     
 class RedisPopQuery(BaseQuery, ReaderMixin):
     template_class = str
+
+# DEFAULT_EXCHANGE_SETTINGS = dict(
+#     durable = True, 
+#     auto_delete = False,
+#     internal = False, 
+#     passive = True,    
+#     content_type = 'text/plain'
+# )
+
+class AmqpExchangeTemplate:
+
+    def __init__(self, exchange_name,
+        durable = True, 
+        auto_delete = False,
+        internal = False, 
+        passive = True,    
+        content_type = 'text/plain'
+        ):
+        self.exchange_name = exchange_name 
+        self.durable = durable
+        self.auto_delete = auto_delete
+        self.internal = internal
+        self.passive = passive
+        self.content_type = content_type
+
+
+# DEFAULT_QUEUE_SETTINGS = dict(
+#     durable = True, 
+#     auto_delete = False,
+#     exclusive = False,
+#     passive = True,    
+# )
+
+class AmqpQueueTemplate:
+    def __init__(self, queue_name,
+        durable = True, 
+        auto_delete = False,
+        exclusive = False,
+        passive = True,    
+        content_type = 'text/plain'
+        ):
+        self.queue_name = queue_name
+        self.durable = durable
+        self.auto_delete = auto_delete
+        self.exclusive = exclusive
+        self.passive = passive
+        self.content_type = content_type
+
+
+class AmqpPublishQuery(BaseQuery, WriterMixin):
+    template_class = AmqpExchangeTemplate
+
+    encoders = {
+        'application/json': json.dumps,
+        'text/plain': str
+    }
+
+    def _transform_params(self, params): # -> dict
+        message = params["message"]
+        routing_key = params.get("routing_key", "")
+        content_type = self.template.content_type
+        try:
+            encoder = self.encoders[content_type]
+        except:
+            raise Exception(f"Unknown content-type: {content_type}")
+        encoded_data = encoder(message)
+        return dict(message=encoded_data, routing_key=routing_key, options=self.template)
+
+class AmqpConsumeQuery(BaseQuery, ReaderMixin):
+    template_class = AmqpQueueTemplate
+
+    # decoders = {
+    #     'application/json': json.loads,
+    #     'text/plain': str
+    # }
+
+    def _transform_params(self, params): # -> dict
+        return dict(options=self.template)

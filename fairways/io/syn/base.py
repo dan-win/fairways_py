@@ -24,11 +24,15 @@ class SynDataDriver(DataDriver):
             self.engine.close()
             self.engine = None
 
+    def _setup_cursor(self, cursor):
+        return cursor
+
     def fetch(self, sql):
         try:
             self._ensure_connection()
             with self.engine.cursor() as cursor:
                 cursor.execute(sql)
+                cursor = self._setup_cursor(cursor)
                 return cursor.fetchall()
         except Exception as e:
             log.error("DB operation error: {} at {}".format(e, self.db_name))

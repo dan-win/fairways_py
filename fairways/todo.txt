@@ -27,3 +27,4 @@ where result computed only after consumption. override right equal __eq.....???
 amqp ... chain 
 graphana?
 
+refactor HttpTemplate to be more consistent with AmqpTemplates

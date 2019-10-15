@@ -22,10 +22,15 @@ class AsyncDataDriver(DataDriver):
             await self.engine.close()
             self.engine = None
 
+    def _setup_cursor(self, cursor):
+        return cursor
+
     async def fetch(self, sql):
         try:
             await self._ensure_connection()
-            async with self.engine.execute(sql) as cursor:
+            async with self.engine.cursor() as cursor:
+                await cursor.execute(sql)
+                cursor = self._setup_cursor(cursor)
                 return await cursor.fetchall()
         except Exception as e:
             log.error("DB operation error: {} at {}".format(e, self.db_name))
