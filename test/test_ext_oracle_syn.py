@@ -11,6 +11,7 @@ def tearDownModule():
 # alter session set "_ORACLE_SCRIPT"=true; 
 # create user houston identified by houston;
 # grant CREATE SESSION, ALTER SESSION, CREATE DATABASE LINK, CREATE MATERIALIZED VIEW, CREATE PROCEDURE, CREATE PUBLIC SYNONYM, CREATE ROLE, CREATE SEQUENCE, CREATE SYNONYM, CREATE TABLE, CREATE TRIGGER, CREATE TYPE, CREATE VIEW, UNLIMITED TABLESPACE to houston;
+# granst select on <testtabsle> to houston;
 
 
 class OracleDbTestCase(unittest.TestCase):
@@ -57,6 +58,7 @@ class OracleDbTestCase(unittest.TestCase):
             db = oracle.OracleDb(db_alias)
 
             sql = "select 99 from dual"
+            # sql = "select * from SYSTEM.regions"
             result = db.fetch(sql)
 
         self.assertEqual(result, [{'99': 99}])

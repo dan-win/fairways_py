@@ -24,9 +24,16 @@ def csv2py(s, typecast_fields=None):
     return py_obj
 
 def trace_middleware_factory(log):
-    def trace_middleware(method, data, **kwargs):
-        result = method(data)
-        log.info("\nSTEP #{} [{}], data after:\n {!r}".format(kwargs["__step"], method.__name__, result))
-        return result
-    return trace_middleware
+    return TraceMiddleware(log)
 
+class TraceMiddleware:
+
+    def __init__(self, log):
+        self.step = 1
+        self.log = log
+
+    def __call__(self, method, data, **kwargs):
+        result = method(data)
+        self.log.info("\nSTEP #{} [{}], data after:\n {!r}".format(self.step, method.__name__, result))
+        self.step += 1
+        return result

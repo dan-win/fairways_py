@@ -259,8 +259,10 @@ class TaskFlowTestCase(unittest.TestCase):
         
         def handle_error(err_info):
             extype, failure = err_info.popitem()
-            self.log.warning(f">>>>>>>>>>>>>>> Triggered: handle_error: {err_info}")
-            error_trace.append("catched")
+            self.log.warning(f">>>>>>>>>>>>>>> Triggered: handle_error: {extype};{failure};{err_info}")
+            typename_extype = type(extype).__name__
+            typename_failure = type(failure).__name__
+            error_trace.append(f"catched, key type: {typename_extype}; value type: {typename_failure}")
             data_before_failure = failure.data_before_failure
             data_before_failure += [extype]
             return data_before_failure
@@ -284,7 +286,7 @@ class TaskFlowTestCase(unittest.TestCase):
         result = chain(arg)
 
         self.assertEqual(result, [1, 2, 'ZeroDivisionError', 'always'])
-        self.assertEqual(error_trace, ['catched'])
+        self.assertEqual(error_trace, ['catched, key type: str; value type: Failure'])
 
 
     def test_catch_on_specific_error(self):
@@ -309,7 +311,8 @@ class TaskFlowTestCase(unittest.TestCase):
 
         def handle_error(error):
             self.log.warning(f">>>>>>>>>>>>>>> Triggered: handle_error: {error}")
-            error_trace.append("catched")
+            typename_error = type(error).__name__
+            error_trace.append("catched: %s" % typename_error)
 
         def step4(arg):
             return arg + ["always"]
@@ -331,7 +334,7 @@ class TaskFlowTestCase(unittest.TestCase):
         result = chain(arg)
 
         self.assertEqual(result, [1, 2, 'always'])
-        self.assertEqual(error_trace, ['catched'])
+        self.assertEqual(error_trace, ['catched: Failure'])
 
     def test_catch_able_to_replace_envelope_after_exception(self):
         Chain = self.Chain

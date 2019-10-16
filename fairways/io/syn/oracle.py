@@ -31,10 +31,10 @@ class OracleConnMixin:
 
 class OracleDb(SynDataDriver, OracleConnMixin):
 
-    autoclose = False
+    autoclose = True
 
     def is_connected(self):
-        return self.engine and self.engine.open
+        return self.engine is not None
     
     def _setup_cursor(self, cursor):
         cursor.rowfactory = makeDictFactory(cursor)
