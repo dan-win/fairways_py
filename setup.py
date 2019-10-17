@@ -1,13 +1,13 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 requirements = ["python>=3.6"]
 
 setup(name='fairways',
-      version='0.8',
-      description='Toolset to organize batch tasks',
+      version='0.9.1',
+      description='Toolset to organize tasks',
       url='https://gitlab.com/danwin/fairways_py#egg=fairways',
       author='Dmitry Zimoglyadov',
       author_email='dmitry.zimoglyadov@gmail.com',
-      license='MIT',
-      packages=['fairways'],
+      license='Apache 2.0',
+      packages=find_packages(),
       zip_safe=False)

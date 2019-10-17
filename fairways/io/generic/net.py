@@ -1,6 +1,6 @@
 from .base import (BaseQuery, ReaderMixin, WriterMixin)
 
-import json
+from .serde import serialize_json
 import urllib.parse
 
 
@@ -8,7 +8,7 @@ class HttpQueryTemplate:
 
     # NOTE: Make more stable solution to create hash (take into account complex cases like "application/json;charset=UTF-8", "text/json, etc."). Use regex to extract "root" part of context type descriptio
     encoders = {
-        'application/json': json.dumps,
+        'application/json': serialize_json,
         'application/x-www-form-urlencoded': lambda d: urllib.parse.urlencode(d, quote_via=urllib.parse.quote)
     }
     
@@ -149,7 +149,7 @@ class AmqpPublishQuery(BaseQuery, WriterMixin):
     template_class = AmqpExchangeTemplate
 
     encoders = {
-        'application/json': json.dumps,
+        'application/json': serialize_json,
         'text/plain': str
     }
 
