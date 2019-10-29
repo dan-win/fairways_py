@@ -28,3 +28,12 @@ amqp ... chain
 graphana?
 
 refactor HttpTemplate to be more consistent with AmqpTemplates
+
+expected_response_code for http-based resources (idea borrowed from influxdb-python package)
+async Influx: https://aioinflux.readthedocs.io/en/stable/usage.html
+
+
+implement Influx query with "select  from": 
+            ####### SELECT * FROM "a_year"."downsampled_orders" LIMIT 5 
+            ####### Notice that we fully qualify (that is, we use the syntax "<retention_policy>"."<measurement>") downsampled_orders in the second SELECT statement. We must specify the RP in that query to SELECT data that reside in an RP other than the DEFAULT RP
+

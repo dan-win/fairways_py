@@ -39,9 +39,11 @@ CONF_KEY = "CONNECTIONS"
 # RE_ENV_EXPRESSION = re.compile(r"\{\$(.*?)\}")
 # RE_URI_TEMPLATE = re.compile(r"(.*?)://(.*?):(.*?)@(.*?):(.*?)/(.*)")
 # RE_URI_TEMPLATE = re.compile(r"(.*?)://(.*?):(.*?)@(.*?):(.*?)/(.*)")
-RE_URI_TEMPLATE = re.compile(r"(?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>.*))?")
+# RE_URI_TEMPLATE = re.compile(r"(?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>.*))?")
+RE_URI_TEMPLATE = re.compile(r"(?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>[^\?]*))?(?:\?(?P<params>[^?\n]+))?")
+# (?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>[^\?]*))?(?:\?(?P<params>[^?\n]+))?
 
-UriParts = namedtuple('UriParts', 'scheme,user,password,host,port,path'.split(','))
+UriParts = namedtuple('UriParts', 'scheme,user,password,host,port,path,params'.split(','))
 
 # this is a pointer to the module object instance itself.
 this = sys.modules[__name__]
@@ -82,7 +84,10 @@ def parse_conn_uri(s):
     """
     match = RE_URI_TEMPLATE.match(s)
     m = match.group
-    return UriParts(m('scheme'), m('user'), m('password'), m('host'), m('port'), m('path'))
+    port = m('port')
+    if port is not None:
+        port = int(port)
+    return UriParts(m('scheme'), m('user'), m('password'), m('host'), port, m('path'), m('params'))
 
 
 class UriConnMixin:
@@ -107,7 +112,7 @@ class FileConnMixin:
         Returns:
             [UriParts] -- Parts of uri
         """
-        return UriParts(None, None, None, None, None, conn_uri)
+        return UriParts(None, None, None, None, None, conn_uri, None)
 
 
 class DataDriver:
@@ -170,7 +175,7 @@ class DataDriver:
         """
         # Convert all iterables to lists to 
         query = query_template.format(**params).replace('\n', " ").replace("\"", "\'")
-        # log.debug("SQL: {}".format(query))
+        log.debug("SQL: {}".format(query))
         return self.fetch(query)
 
     def execute(self, query_template, **params):

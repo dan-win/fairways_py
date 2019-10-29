@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 requirements = ["python>=3.6"]
 
 setup(name='fairways',
-      version='0.9.1',
+      version='0.9.5',
       description='Toolset to organize tasks',
       url='https://gitlab.com/danwin/fairways_py#egg=fairways',
       author='Dmitry Zimoglyadov',
