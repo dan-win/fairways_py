@@ -37,3 +37,8 @@ implement Influx query with "select  from":
             ####### SELECT * FROM "a_year"."downsampled_orders" LIMIT 5 
             ####### Notice that we fully qualify (that is, we use the syntax "<retention_policy>"."<measurement>") downsampled_orders in the second SELECT statement. We must specify the RP in that query to SELECT data that reside in an RP other than the DEFAULT RP
 
+funcflow: pluck: make safe against absent keys!
+
+Diagrams: add external resources (DB, AMQP, ...); +solve tooltips? or callouts?
+
+tests for funcflow for "sparce" objects where some keys absent - for group_by, index_by, ... 

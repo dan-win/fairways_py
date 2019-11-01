@@ -28,7 +28,7 @@ from fairways.decorators import use
 from fairways.conf import replace_env_vars
 
 import logging
-log = logging.getLogger(__name__)
+log = logging.getLogger()
 
 import os
 import sys

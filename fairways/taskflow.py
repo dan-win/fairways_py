@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 import functools
 import uuid
 
@@ -91,13 +92,21 @@ class SkipFollowing(Exception):
 
 
 class Failure(Exception):
-    def __init__(self, exception, data_before_failure, **kwargs):
+    def __init__(self, exception, data_before_failure, method=None, topic=None, **kwargs):
         self.exception = exception
         self.data_before_failure = data_before_failure
         self.details = kwargs
+
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        self.exc_type = exc_type.__name__
+        self.method = method
+        self.topic = topic
+        self.fname = fname 
+        self.line = exc_tb.tb_lineno
     
     def __str__(self):
-        return f"Chain failure: {self.exception}; {self.exception!r}; {self.data_before_failure}; {self.details}"
+        return f"Chain failure: {self.exc_type} at method \"{self.method}\" in module {self.fname} (line {self.line}) | {self.exception!r}; {self.data_before_failure}; {self.details}"
 
 class Chain:
     # AbsChain, SequentialChain, AndChain, OrChain
@@ -144,7 +153,7 @@ class Chain:
 
             except Exception as e:
                 data_before_failure = ff.copy(envelope.state[Envelope.DATA_ROOT])
-                failure = Failure(e, data_before_failure)
+                failure = Failure(e, data_before_failure, method=method.__name__, topic=topic)
                 envelope.set_failure({e.__class__.__name__: failure})
                 log.debug(f"[E] Running '{method.__name__}'; topic: '{topic}'; envelope: {envelope.state}")
 

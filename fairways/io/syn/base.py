@@ -28,6 +28,7 @@ class SynDataDriver(DataDriver):
         return cursor
 
     def fetch(self, sql):
+        log.debug("MySql: SQL fetch: {}".format(sql))
         try:
             self._ensure_connection()
             with self.engine.cursor() as cursor:

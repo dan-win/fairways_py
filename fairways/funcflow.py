@@ -15,8 +15,8 @@ class FuncFlow(object):
         """
 
         def clone_obj(item):
-            if isinstance(item, collections.Mapping):
-                return dict(**item)
+            if isinstance(item, collections.abc.Mapping):
+                return {k:v for (k, v) in item.items()}
             if isinstance(item, (list, tuple)):
                 return list(item)
             return None
