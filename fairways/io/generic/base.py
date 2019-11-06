@@ -27,6 +27,9 @@ from fairways.decorators import use
 
 from fairways.conf import replace_env_vars
 
+from cached_property import cached_property
+from urllib.parse import parse_qs as _parse_qs
+
 import logging
 log = logging.getLogger()
 
@@ -83,6 +86,8 @@ def parse_conn_uri(s):
         [UriParts] -- [Parsed uri]
     """
     match = RE_URI_TEMPLATE.match(s)
+    if not match:
+        raise ValueError(f"Cannot parse connection string '{s}' with patterns registered")
     m = match.group
     port = m('port')
     if port is not None:
@@ -100,7 +105,9 @@ class UriConnMixin:
         Returns:
             [UriParts] -- Parts of uri
         """
+        log.debug("Parsing uri: %s", conn_uri)
         return parse_conn_uri(conn_uri)
+            
 
 class FileConnMixin:
     def _parse_uri(self, conn_uri):
@@ -161,6 +168,17 @@ class DataDriver:
 
     def __str__(self):
         return f"Driver {self.__class__.__name__} | {self.conn_str}"
+
+    @cached_property
+    def qs_params(self):
+        def unwrap(v):
+            "Unwrap all lists with single item"
+            return v[0] if isinstance(v, list) and len(v) == 1 else v
+        params = self.uri_parts.params
+        if params:
+            params = _parse_qs(params)
+            return {k:unwrap(v) for k, v in params.items()}
+        return {}
 
     # def fetch(self, sql):
     #     raise NotImplementedError()
