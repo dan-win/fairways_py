@@ -42,7 +42,6 @@ class OracleDb(SynDataDriver, OracleConnMixin):
 
     def _connect(self):
         user, password, dsn = self.uri_parts
-        print("DSN: ", user, password, dsn)
         self.engine = cx_Oracle.connect(user, password, dsn, encoding="UTF-8")
     
 

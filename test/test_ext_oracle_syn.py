@@ -15,15 +15,11 @@ def tearDownModule():
 
 
 class OracleDbTestCase(unittest.TestCase):
-    db_test_file = "./test.oracle"
     CONN_STR = "houston/houston@//localhost:51521/XE"
 
     @classmethod
     def clean_test_db(cls):
         pass
-        # import os
-        # if os.path.exists(cls.db_test_file):
-        #     os.remove(cls.db_test_file)
 
     @classmethod
     def setUpClass(cls):
@@ -70,7 +66,7 @@ class OracleDbTestCase(unittest.TestCase):
 
     #     db_alias = "MY_TEST_SQLITE"
 
-    #     with unittest.mock.patch.dict('os.environ', {db_alias: self.db_test_file}, clear=True):
+    #     with unittest.mock.patch.dict('os.environ', {db_alias: self.CONN_STR}, clear=True):
     #         db = oracle.SqLite(db_alias)
 
     #         sql = """CREATE TABLE fairways (id integer primary key, name varchar);"""

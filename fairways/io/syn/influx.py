@@ -5,7 +5,6 @@ import re
 
 from .base import (SynDataDriver, UriConnMixin)
 from influxdb import InfluxDBClient
-from urllib.parse import parse_qs as _parse_qs
 
 import logging
 log = logging.getLogger(__name__)
@@ -23,16 +22,7 @@ class InfluxDb(SynDataDriver, UriConnMixin):
     
     @property
     def time_precision(self):
-        if hasattr(self, '__t_precision'):
-            return getattr(self, '__t_precision')
-        parts = self.uri_parts
-        precision = 'ms'
-        params = parts.params 
-        if params:
-            params = _parse_qs(parts.params)
-            # precision=[ns,u,ms,s,m,h]	
-            precision = params.get('precision', 'ms')
-        setattr(self, '__t_precision', precision)
+        precision = self.qs_params.get('precision', 'ms')
         return precision
 
     def _connect(self):
@@ -40,8 +30,7 @@ class InfluxDb(SynDataDriver, UriConnMixin):
         udp_port = 4444
         use_udp = bool(parts.scheme == "udp+influxdb")
         if use_udp:
-            params = _parse_qs(parts.params)
-            udp_port = int(para.get("udp_port"))
+            udp_port = int(self.qs_params.get("udp_port"))
         engine = InfluxDBClient(
             host=parts.host, 
             port=parts.port, 

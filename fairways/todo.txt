@@ -44,6 +44,11 @@ Diagrams: add external resources (DB, AMQP, ...); +solve tooltips? or callouts?
 tests for funcflow for "sparce" objects where some keys absent - for group_by, index_by, ... 
 
 
+<<<<<<< HEAD
 entities.py - consider to use ci.utils.module_of_callable to avoid unexpected results in callable.__module__ for class-based callables
 
 StateObserver - at each time of event - write ALL chain states (timestaps will be made by Influx itself)
+=======
+Database drivers - add alternative "connection factory" parameter to constructor to use extended capabilities of underlying driver (e.g. Cassandra: "load_balancing_policy", "compression", etc...)
+
+>>>>>>> origin/master

@@ -1,4 +1,5 @@
 aiosqlite==0.10.0
+cached-property==1.5.1
 certifi==2019.9.11
 cffi==1.12.3
 chardet==3.0.4
