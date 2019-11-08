@@ -245,6 +245,31 @@ class FuncFlowTestCase(unittest.TestCase):
 
         })
 
+    def test_index_by_lambda(self):
+        """
+        Given a list, and an iteratee function that returns a key for each element in the list (or a property name), returns an object with an index of each item. Just like groupBy, but for when you know your keys are unique.
+        """
+        ff = self.FuncFlow
+        
+        test_data = [
+            {"name":"John", "age":25, "occupation":"soldier"},
+            {"name":"Jim", "age":30, "occupation":"actor"},
+            {"name":"Jane", "age":25, "occupation":"soldier"},
+            {"name":"Joker", "age":50, "occupation":"actor"},
+            {"name":"Jarvis", "age":100, "occupation":"mad scientist"},
+            {"name":"Jora", "age":5, "occupation":"child"},
+        ]
+        result = ff.index_by(test_data, lambda item: item["name"])
+        self.assertEqual(result, {
+            "John": {"name":"John", "age":25, "occupation":"soldier"},
+            "Jim":{"name":"Jim", "age":30, "occupation":"actor"},
+            "Jane":{"name":"Jane", "age":25, "occupation":"soldier"},
+            "Joker":{"name":"Joker", "age":50, "occupation":"actor"},
+            "Jarvis":{"name":"Jarvis", "age":100, "occupation":"mad scientist"},
+            "Jora":{"name":"Jora", "age":5, "occupation":"child"},
+
+        })
+
     def test_pluck(self):
         """
         """

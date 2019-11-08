@@ -134,6 +134,51 @@ class TaskFlowTestCase(unittest.TestCase):
         self.assertEqual(trace, ['step1', 'step2', 'step3'])
 
 
+    def test_middleware_exact_calls(self):
+        """
+        Middleware should be called only on methods which actually invoked
+        """
+        Chain = self.Chain
+
+        arg = {}
+
+        trace = []
+
+        def mid_show_name(method, arg, **kwargs):
+            """
+            Transforms dict to list of pairs
+            """
+            trace.append(method.__name__)
+            return method(arg)
+
+        def step1(arg):
+            return arg
+
+        def step2(arg):
+            1/0
+            return arg
+
+        def step3(arg):
+            return arg
+
+        def catch(arg):
+            return arg
+
+        chain = Chain(
+        ).then(
+            step1
+        ).then(
+            step2
+        ).then(
+            step3
+        ).catch(
+            catch
+        )
+
+        result = chain(arg, middleware=mid_show_name)
+
+        self.assertEqual(trace, ['step1', 'step2', 'catch'])
+
 
     def test_on_if_found(self):
         Chain = self.Chain

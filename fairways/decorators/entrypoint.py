@@ -9,6 +9,8 @@ log = logging.getLogger(__name__)
 import functools
 
 from abc import abstractmethod
+
+import sys
 import argparse
 
 class EntrypointRegistryItem(RegistryItem):
@@ -20,8 +22,9 @@ class EntrypointRegistryItem(RegistryItem):
     def __str__(self):
         return f"Entrypoint: '{self.module}:{self.mark_name}' in function: '{self.handler.__name__}'"
     
+    @classmethod
     @abstractmethod
-    def run(self, args):
+    def run(self, args=None):
         pass
 
 class Channel(Mark):
@@ -44,17 +47,18 @@ class Cli(Channel):
     decorator_required_kwargs = []
     description = "Run with args"
 
-    def run(self, args):
+    @classmethod
+    def run(cls, args=None):
         def run_item(entrypoint_item):
             pass
-
+        
+        args = args or sys.argv
         parser = argparse.ArgumentParser()
         parser.add_argument('-e',  '--entrypoint', required=True, help='Select entrypoint param')
         args = parser.parse_args()
         entrypoint = args.entrypoint
 
-
-        item_to_run = self.chain().find(lambda item: item.meta.get("param") == entrypoint)
+        item_to_run = cls.chain().find(lambda item: item.meta.get("param") == entrypoint).value
         if not item_to_run:
             raise ValueError(f"Cannot find entrypoint {entrypoint}")
         item_to_run.handler()
