@@ -5,6 +5,8 @@ import csv
 import logging
 log = logging.getLogger(__name__)
 
+from fairways.decorators.apitag import tentative 
+
 def csv2py(s, typecast_fields=None):
     """
     Convert tab-delimited text with headers row to list if dicts.
@@ -38,6 +40,7 @@ class TraceMiddleware:
         self.step += 1
         return result
 
+@tentative
 def render_diagram(chain):
     "Render Mermaid.js markdown for external dashbords like Grafana"
     class NodeInfo:

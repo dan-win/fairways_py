@@ -105,6 +105,23 @@ class DecoratorsTestCase(unittest.TestCase):
         result = func(None)
         self.assertEqual(result, {'env1': 1, 'env2': 1, 'env3': 1})
 
+    def test_cmd_param_run(self):
+        entrypoint = self.entrypoint
+
+        @entrypoint.cmd(param="test_command_1")
+        def runner(*args, **kwargs):
+            return "Command 1 called"
+        
+        @entrypoint.cmd(param="test_command_2")
+        def runner(*args, **kwargs):
+            return "Command 2 called"
+
+        result = entrypoint.Cmd.run(args=["--command", "test_command_1"])
+        self.assertEqual('Command 1 called', result)
+
+        result = entrypoint.Cmd.run(args=["--command", "test_command_2"])
+        self.assertEqual('Command 2 called', result)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

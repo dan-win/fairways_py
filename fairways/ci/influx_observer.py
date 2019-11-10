@@ -28,7 +28,7 @@ import os
 DB_ALIAS = "db_fwff"
 os.environ[DB_ALIAS] = "influxdb://houston:houston@localhost:8086/fairways_flow"
 
-@entrypoint.cli(param="initdb")
+@entrypoint.cmd(param="initdb")
 def init_db():
     conn = InfluxDb(DB_ALIAS)
     # conn.execute("""CREATE DATABASE fairways_flow """)

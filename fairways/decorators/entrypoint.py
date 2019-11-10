@@ -43,9 +43,17 @@ class Cron(Channel):
 @register_decorator
 class Cli(Channel):
     mark_name = "cli"
+    decorator_kwargs = []
+    decorator_required_kwargs = []
+
+
+@register_decorator
+class Cmd(Channel):
+    mark_name = "cmd"
     decorator_kwargs = ["param"]
     decorator_required_kwargs = []
-    description = "Run with args"
+    description = "Run command by args"
+    once_per_module = False
 
     @classmethod
     def run(cls, args=None):
@@ -54,14 +62,14 @@ class Cli(Channel):
         
         args = args or sys.argv
         parser = argparse.ArgumentParser()
-        parser.add_argument('-e',  '--entrypoint', required=True, help='Select entrypoint param')
-        args = parser.parse_args()
-        entrypoint = args.entrypoint
+        parser.add_argument('-c',  '--command', required=True, help='Select entrypoint by command param')
+        args = parser.parse_args(args)
+        command = args.command
 
-        item_to_run = cls.chain().find(lambda item: item.meta.get("param") == entrypoint).value
+        item_to_run = cls.chain().find(lambda item: item.meta.get("param") == command).value
         if not item_to_run:
-            raise ValueError(f"Cannot find entrypoint {entrypoint}")
-        item_to_run.handler()
+            raise ValueError(f"Cannot find entrypoint by param: {command}")
+        return item_to_run.handler()
 
 @register_decorator
 class QA(Channel):

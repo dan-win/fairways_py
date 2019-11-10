@@ -1,7 +1,7 @@
 from fairways import (taskflow, funcflow)
 from abc import abstractmethod
 from typing import Callable
-from .utils import module_of_callable
+from .utils import (module_of_callable, render_diagram)
 from enum import Enum
 
 ff = funcflow.FuncFlow
@@ -38,6 +38,21 @@ class DryRunMiddleware:
 def f2str(f):
     return f"{module_of_callable(f)}.{f.__name__}"
 
+class DiagramNode:
+    last_node_id = 0
+
+    def __init__(self, node):            
+        self.__class__.last_node_id += 1
+        self.id = f"ID{self.__class__.last_node_id}"
+        self.label = node.name
+        self.node_type = node.__class__.__name__
+        method = node.method
+        self.comments = method.__doc__
+        tags = node.topic.split("/")
+        self.topic_root = tags.pop(0)
+        self.sub_topic = "/".join(tags)
+        self.grounding = bool(self.topic_root == taskflow.Envelope.FAILURE_ROOT)
+
 
 class StateDef:
     def __init__(self, handler, method, order):
@@ -66,6 +81,12 @@ class StateShapeExplorer(DryRunMiddleware):
         handler = self.handler_of_method(method, chain)
 
         return StateDef(handler, method, step)
+    
+
+class Diagram:
+
+    def __init__(self):
+        pass
 
 
 class ProcessState(Enum):
