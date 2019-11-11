@@ -5,6 +5,8 @@ import csv
 import logging
 log = logging.getLogger(__name__)
 
+from fairways.decorators.apitag import tentative 
+
 def csv2py(s, typecast_fields=None):
     """
     Convert tab-delimited text with headers row to list if dicts.
@@ -38,6 +40,7 @@ class TraceMiddleware:
         self.step += 1
         return result
 
+@tentative
 def render_diagram(chain):
     "Render Mermaid.js markdown for external dashbords like Grafana"
     class NodeInfo:
@@ -102,3 +105,19 @@ def render_diagram(chain):
         element, prev_id, child_path = info.render(prev_id, child_path)
         trace.append(element)
     return "\n".join(trace)
+
+
+def module_of_callable(c):
+    """Find name of module where callable is defined
+    
+    Arguments:
+        c {Callable} -- Callable to inspect
+    
+    Returns:
+        str -- Module name (as for x.__module__ attribute)
+    """
+    # Ordinal function defined with def or lambda:
+    if type(c).__name__ == 'function':
+        return c.__module__
+    # Some callable, probably it's a class with __call_ method, so define module of declaration rather than a module of instantiation:
+    return c.__class__.__module__

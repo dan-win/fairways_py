@@ -172,7 +172,7 @@ class FuncFlow(object):
         if isinstance(iteratee, str):
             attrname = iteratee
             method = lambda v: v[attrname]
-        elif iterfunc(iteratee):
+        elif callable(iteratee):
             method = iteratee
         else:
             raise TypeError()
@@ -256,7 +256,7 @@ class Chain(object):
 def _align_type(data):
     if data is None:
         return data
-    if isinstance(data, (int, bool, float, str, dict)):
+    if isinstance(data, (int, bool, float, str, object, dict)):
         return data
     # if isinstance(data, dict):
     #     return dict(data)
