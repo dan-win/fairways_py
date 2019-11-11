@@ -15,6 +15,6 @@ setup(name='fairways',
             'colorlog>=4.0.2',
             'python-dateutil>=2.8.0',
             'python-dotenv>=0.10.3',
-            'requests>=2.22.0'
+            'requests>=2.22.0',
       ],
       zip_safe=False)

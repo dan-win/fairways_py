@@ -8,6 +8,9 @@ def tearDownModule():
     pass
 
 
+from test.test_env import SKIP_EXT_DB_SERVERS
+@unittest.skipIf(SKIP_EXT_DB_SERVERS, 
+    "Skip when test servers are not available in environment")
 class InfluxDbTestCase(unittest.TestCase):
     CONN_STR = "influxdb://houston:houston@localhost:8086/testdb"
     db_alias = "MY_TEST_INFLUX"

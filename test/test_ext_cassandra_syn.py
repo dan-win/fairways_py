@@ -14,6 +14,9 @@ def tearDownModule():
 # granst select on <testtabsle> to houston;
 
 
+from test.test_env import SKIP_EXT_DB_SERVERS
+@unittest.skipIf(SKIP_EXT_DB_SERVERS, 
+    "Skip when test servers are not available in environment")
 class CassandraDbTestCase(unittest.TestCase):
     CONN_STR = "cassandra://localhost:9043?request_timeout=30.0"
 

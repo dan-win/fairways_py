@@ -7,6 +7,10 @@ def setUpModule():
 def tearDownModule():
     pass
 
+
+from test.test_env import SKIP_EXT_DB_SERVERS
+@unittest.skipIf(SKIP_EXT_DB_SERVERS, 
+    "Skip when test servers are not available in environment")
 class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
     conn_str = "amqp://fairways:fairways@localhost:5672/%2f"
 

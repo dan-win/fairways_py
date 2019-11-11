@@ -7,6 +7,9 @@ def setUpModule():
 def tearDownModule():
     pass
 
+from test.test_env import SKIP_EXT_DB_SERVERS
+@unittest.skipIf(SKIP_EXT_DB_SERVERS, 
+    "Skip when test servers are not available in environment")
 class RedisPublishConsumeTestCase(unittest.TestCase):
     # conn_str = "redis://localhost:6370"
     conn_str = "unix:///home/dmitriy/docker-sockets/atacama_cache/redis.sock"
