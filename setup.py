@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-requirements = ["python>=3.6"]
+requirements = ["python>=3.3"]
 
 setup(name='fairways',
       version='0.9.7',

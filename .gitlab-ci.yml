@@ -12,13 +12,33 @@ stages:
   - deploy
   - docs
 
-test:
-  image: python:3.6
+test:py35:
+  image: python:3.5-slim
   stage: test
   script:
     - pip install -r requirements.txt
-    - ./runtests.sh
-    # - python setup.py test --addopts "--cov=pypkgtemp"
+    - python -m unittest
+
+test:py36:
+  image: python:3.6-slim
+  stage: test
+  script:
+    - pip install -r requirements.txt
+    - python -m unittest
+
+test:py37:
+  image: python:3.7-slim
+  stage: test
+  script:
+    - pip install -r requirements.txt
+    - python -m unittest
+
+test:py38:
+  image: python:3.8-slim
+  stage: test
+  script:
+    - pip install -r requirements.txt
+    - python -m unittest
 
 # deploy_pypi:
 #   image: python:3.6

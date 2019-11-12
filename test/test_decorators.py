@@ -58,7 +58,7 @@ class DecoratorsTestCase(unittest.TestCase):
 
         self.assertIsNotNone(found)
 
-        self.assertEqual(should_be, {
+        self.assertDictEqual(should_be, {
             'method': 'test_run', 
             'mark_name': 'qa', 
             'module': __name__,
@@ -74,7 +74,7 @@ class DecoratorsTestCase(unittest.TestCase):
             return env
 
         result = func(None)
-        self.assertEqual(result, {'newkey': 2, 'test': 1})
+        self.assertDictEqual(result, {'newkey': 2, 'test': 1})
 
     def test_with_env_var(self):
         """
@@ -89,7 +89,7 @@ class DecoratorsTestCase(unittest.TestCase):
             return env
 
         result = func(None)
-        self.assertEqual(result, {'TEST_VAR':'TEST_VALUE'})
+        self.assertDictEqual(result, {'TEST_VAR':'TEST_VALUE'})
 
     def test_with_env_addition(self):
         """
@@ -103,7 +103,7 @@ class DecoratorsTestCase(unittest.TestCase):
             return env
 
         result = func(None)
-        self.assertEqual(result, {'env1': 1, 'env2': 1, 'env3': 1})
+        self.assertDictEqual(result, {'env1': 1, 'env2': 1, 'env3': 1})
 
     def test_cmd_param_run(self):
         entrypoint = self.entrypoint

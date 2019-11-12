@@ -57,7 +57,7 @@ class IoTaskTestCase(unittest.TestCase):
         data = asyn2(data)
         data = syn3(data)
 
-        self.assertEqual(data, [1, 2, 3])
+        self.assertListEqual(data, [1, 2, 3])
 
     def test_io_task_concurrent(self):
         """
@@ -217,7 +217,7 @@ class CpuTaskTestCase(unittest.TestCase):
         data = heavy_syn(data)
         data = syn3(data)
 
-        self.assertEqual(data, [1, 2, 3])
+        self.assertListEqual(data, [1, 2, 3])
 
     def test_cpu_task_returns_value(self):
         """

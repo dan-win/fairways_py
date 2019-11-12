@@ -34,7 +34,7 @@ class FuncFlowTestCase(unittest.TestCase):
 
         clone = ff.deep_extend({}, original)
 
-        self.assertEqual(original, clone, "Clones should have identical values")
+        self.assertDictEqual(original, clone, "Clones should have identical values")
 
         # Change original children:
         nested_list[0] = None
@@ -45,7 +45,10 @@ class FuncFlowTestCase(unittest.TestCase):
         self.assertNotEqual(clone["nested_dict"]["attr1"], None,
             "Nested dict should be independent instance")
         
-        self.assertEqual(ff.deep_extend({'a': {'b': 2}}, {'a': {'b': 3, 'd': 4}, 'e': 5}), {'a': {'b': 3, 'd': 4}, 'e': 5})
+        self.assertDictEqual(
+            ff.deep_extend({'a': {'b': 2}}, {'a': {'b': 3, 'd': 4}, 'e': 5}), 
+            {'a': {'b': 3, 'd': 4}, 'e': 5}
+        )
         
     def test_uniq(self):
         """
@@ -53,7 +56,7 @@ class FuncFlowTestCase(unittest.TestCase):
         ff = self.FuncFlow
 
         result = ff.uniq([1, 2, 1, 4, 1, 3])
-        self.assertEqual(result, [1, 2, 4, 3])
+        self.assertListEqual(result, [1, 2, 4, 3])
 
     def test_filter(self):
         """
@@ -62,7 +65,7 @@ class FuncFlowTestCase(unittest.TestCase):
 
         evens = ff.filter([1, 2, 3, 4, 5, 6], lambda v: v % 2 == 0)
 
-        self.assertEqual(evens, [2,4,6])
+        self.assertListEqual(evens, [2,4,6])
 
     def test_reduce(self):
         """
@@ -80,7 +83,7 @@ class FuncFlowTestCase(unittest.TestCase):
 
         result = ff.extend({}, {'name': 'moe'}, {'age': 50}, {'name': 'new'})
 
-        self.assertEqual(result, {'name': 'new', 'age': 50})
+        self.assertDictEqual(result, {'name': 'new', 'age': 50})
 
     def test_omit(self):
         """
@@ -89,7 +92,7 @@ class FuncFlowTestCase(unittest.TestCase):
 
         result = ff.omit({'name': 'moe', 'age': 50, 'userid': 'moe1'}, 'userid')
 
-        self.assertEqual(result, {'name': 'moe', 'age': 50})
+        self.assertDictEqual(result, {'name': 'moe', 'age': 50})
 
     def test_pick(self):
         """
@@ -97,7 +100,7 @@ class FuncFlowTestCase(unittest.TestCase):
         ff = self.FuncFlow
         result = ff.pick({'name': 'moe', 'age': 50, 'userid': 'moe1'}, 'name', 'age')
 
-        self.assertEqual(result, {'name': 'moe', 'age': 50})
+        self.assertDictEqual(result, {'name': 'moe', 'age': 50})
 
     def test_contains(self):
         """
@@ -175,7 +178,7 @@ class FuncFlowTestCase(unittest.TestCase):
         criteria = {"age": 25, "occupation":"soldier"}
         result = ff.find_where(test_data, **criteria)
 
-        self.assertEqual(result, {'name': 'John', 'age': 25, 'occupation': 'soldier'})
+        self.assertDictEqual(result, {'name': 'John', 'age': 25, 'occupation': 'soldier'})
 
     def test_map(self):
         """
@@ -183,10 +186,10 @@ class FuncFlowTestCase(unittest.TestCase):
         ff = self.FuncFlow
 
         result = ff.map([1, 2, 3, 4, 5, 6], lambda num: num * 2)
-        self.assertEqual(result, [2, 4, 6, 8, 10, 12], "Should operate with lists")
+        self.assertListEqual(result, [2, 4, 6, 8, 10, 12], "Should operate with lists")
 
         result = ff.map({"a":1, "b":2, "c":3, "d":4, "e":5, "f":6}, lambda num, key: num * 2)
-        self.assertEqual(result, {"a":2, "b":4, "c":6, "d":8, "e":10, "f":12}, "Should operate with lists")
+        self.assertDictEqual(result, {"a":2, "b":4, "c":6, "d":8, "e":10, "f":12}, "Should operate with dicts")
 
     def test_group_by(self):
         """
@@ -194,8 +197,10 @@ class FuncFlowTestCase(unittest.TestCase):
         """
         ff = self.FuncFlow
 
-        result = ff.group_by(["London", "Paris", "Lissabon", "Pert"], lambda s: s[:1])
-        self.assertEqual(result, {'L': ['London', 'Lissabon'], 'P': ['Paris', 'Pert']})
+        result = ff.group_by(["London", "Paris", "Lissabon", "Perth"], lambda s: s[:1])
+        # result is {'L': ['London', 'Lissabon'], 'P': ['Paris', 'Perth']}
+        self.assertListEqual(result['L'], ['London', 'Lissabon'])
+        self.assertListEqual(result['P'], ['Paris', 'Perth'])
 
         test_data = [
             {"name":"John", "age":25, "occupation":"soldier"},
@@ -235,15 +240,14 @@ class FuncFlowTestCase(unittest.TestCase):
             {"name":"Jora", "age":5, "occupation":"child"},
         ]
         result = ff.index_by(test_data, "name")
-        self.assertEqual(result, {
-            "John": {"name":"John", "age":25, "occupation":"soldier"},
-            "Jim":{"name":"Jim", "age":30, "occupation":"actor"},
-            "Jane":{"name":"Jane", "age":25, "occupation":"soldier"},
-            "Joker":{"name":"Joker", "age":50, "occupation":"actor"},
-            "Jarvis":{"name":"Jarvis", "age":100, "occupation":"mad scientist"},
-            "Jora":{"name":"Jora", "age":5, "occupation":"child"},
 
-        })
+        self.assertListEqual(list(result.keys()), ["John", "Jim", "Jane", "Joker", "Jarvis", "Jora"]) 
+        self.assertDictEqual(result["John"], {"name":"John", "age":25, "occupation":"soldier"})
+        self.assertDictEqual(result["Jim"], {"name":"Jim", "age":30, "occupation":"actor"})
+        self.assertDictEqual(result["Jane"], {"name":"Jane", "age":25, "occupation":"soldier"})
+        self.assertDictEqual(result["Joker"], {"name":"Joker", "age":50, "occupation":"actor"})
+        self.assertDictEqual(result["Jarvis"], {"name":"Jarvis", "age":100, "occupation":"mad scientist"})
+        self.assertDictEqual(result["Jora"], {"name":"Jora", "age":5, "occupation":"child"})
 
     def test_index_by_lambda(self):
         """
@@ -259,16 +263,16 @@ class FuncFlowTestCase(unittest.TestCase):
             {"name":"Jarvis", "age":100, "occupation":"mad scientist"},
             {"name":"Jora", "age":5, "occupation":"child"},
         ]
-        result = ff.index_by(test_data, lambda item: item["name"])
-        self.assertEqual(result, {
-            "John": {"name":"John", "age":25, "occupation":"soldier"},
-            "Jim":{"name":"Jim", "age":30, "occupation":"actor"},
-            "Jane":{"name":"Jane", "age":25, "occupation":"soldier"},
-            "Joker":{"name":"Joker", "age":50, "occupation":"actor"},
-            "Jarvis":{"name":"Jarvis", "age":100, "occupation":"mad scientist"},
-            "Jora":{"name":"Jora", "age":5, "occupation":"child"},
 
-        })
+        result = ff.index_by(test_data, lambda item: item["name"])
+
+        self.assertListEqual(list(result.keys()), ["John", "Jim", "Jane", "Joker", "Jarvis", "Jora"]) 
+        self.assertDictEqual(result["John"], {"name":"John", "age":25, "occupation":"soldier"})
+        self.assertDictEqual(result["Jim"], {"name":"Jim", "age":30, "occupation":"actor"})
+        self.assertDictEqual(result["Jane"], {"name":"Jane", "age":25, "occupation":"soldier"})
+        self.assertDictEqual(result["Joker"], {"name":"Joker", "age":50, "occupation":"actor"})
+        self.assertDictEqual(result["Jarvis"], {"name":"Jarvis", "age":100, "occupation":"mad scientist"})
+        self.assertDictEqual(result["Jora"], {"name":"Jora", "age":5, "occupation":"child"})
 
     def test_pluck(self):
         """
@@ -279,7 +283,7 @@ class FuncFlowTestCase(unittest.TestCase):
 
         result = ff.pluck(test_data, "name")
 
-        self.assertEqual(result, ['moe', 'larry', 'curly'])
+        self.assertListEqual(result, ['moe', 'larry', 'curly'])
 
     def test_sort_by(self):
         """
@@ -288,7 +292,7 @@ class FuncFlowTestCase(unittest.TestCase):
 
         result = ff.sort_by([5, 4, 6, 3, 1000, 200], lambda value: str(value))
 
-        self.assertEqual(result, [1000, 200, 3, 4, 5, 6])
+        self.assertListEqual(result, [1000, 200, 3, 4, 5, 6])
 
     def test_size(self):
         """

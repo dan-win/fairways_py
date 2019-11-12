@@ -45,23 +45,6 @@ class CassandraDbTestCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.clean_test_db()
 
-    # def test_select_const(self):
-    #     """
-    #     """
-    #     cassandra = self.cassandra
-
-    #     # default=":memory:"
-    #     db_alias = "MY_TEST_CASSANDRA"
-
-    #     with unittest.mock.patch.dict('os.environ', {db_alias: self.CONN_STR}, clear=True):
-    #         db = cassandra.Cassandra(db_alias)
-
-    #         cql = "select 99 from dual"
-    #         # cql = "select * from SYSTEM.regions"
-    #         result = db.fetch(cql)
-
-    #     self.assertEqual(result, [{'99': 99}])
-
     def test_create_read(self):
         """
         """
@@ -96,5 +79,7 @@ class CassandraDbTestCase(unittest.TestCase):
             
             # db.execute(cql)
 
-        self.assertEqual(result, [{'name': 'My Way'}])
+
+        self.assertEqual(len(result), 1)
+        self.assertDictEqual(result[0], {'name': 'My Way'})
 

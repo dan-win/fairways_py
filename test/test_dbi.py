@@ -51,7 +51,6 @@ class DbiTestCase(unittest.TestCase):
         db = test(None)
 
         attrs = [name for name in dir(db) if not name.startswith('_')]
-        # self.assertEqual(attrs, ['queries'])
         self.assertTrue(isinstance(db.QUERY1, SqlQuery))
 
     def test_create_fixture(self):
@@ -90,7 +89,10 @@ class DbiTestCase(unittest.TestCase):
 
         print("Test stringify behaviour: %s" % fixture)
 
-        self.assertEqual(fixture.QUERY1.get_records(), [{'name': 'fixture value'}])
+        result = fixture.QUERY1.get_records()
+        self.assertEqual(len(result), 1)
+        self.assertDictEqual(result[0], {'name': 'fixture value'})
+
         self.assertEqual(fixture.__name__, 'MyLocalFixture')
 
         self.assertEqual(test(None).__name__, 'TestDb', 

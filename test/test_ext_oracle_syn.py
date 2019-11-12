@@ -60,29 +60,7 @@ class OracleDbTestCase(unittest.TestCase):
             # sql = "select * from SYSTEM.regions"
             result = db.fetch(sql)
 
-        self.assertEqual(result, [{'99': 99}])
+        self.assertEqual(len(result), 1)
+        self.assertDictEqual(result[0], {'99': 99})
 
-    # def test_create_read(self):
-    #     """
-    #     """
-    #     oracle = self.oracle
-
-    #     db_alias = "MY_TEST_SQLITE"
-
-    #     with unittest.mock.patch.dict('os.environ', {db_alias: self.CONN_STR}, clear=True):
-    #         db = oracle.SqLite(db_alias)
-
-    #         sql = """CREATE TABLE fairways (id integer primary key, name varchar);"""
-            
-    #         db.execute(sql)
-
-    #         sql = """insert into fairways (id, name) values (1, "My Way");"""
-            
-    #         db.execute(sql)
-
-    #         sql = """select name from fairways where id=1;"""
-            
-    #         result = db.fetch(sql)
-            
-    #     self.assertEqual(result, [{'name': 'My Way'}])
 

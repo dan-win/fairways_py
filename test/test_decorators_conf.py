@@ -57,7 +57,7 @@ class ConfigTestCase(unittest.TestCase):
         # 2. Load conf
         conf.load(settings)
 
-        self.assertEqual(result, {'config': 'VALUE2'})
+        self.assertDictEqual(result, {'config': 'VALUE2'})
 
 
     def test_decorator_after_conf_load(self):
@@ -79,7 +79,7 @@ class ConfigTestCase(unittest.TestCase):
         def set_conf(sub_conf):
             result.update({"config": sub_conf})
         
-        self.assertEqual(result, {'config': 'VALUE2'})
+        self.assertDictEqual(result, {'config': 'VALUE2'})
 
 
     def test_decorated_direct_call(self):

@@ -21,7 +21,7 @@ DEFAULT_CONF = {
     'disable_existing_loggers': False,
     "handlers": {
         "console": {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'color'            
         },
@@ -70,7 +70,7 @@ DEFAULT_CONF = {
     "loggers": {
         "": {
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "INFO",
             "formatter": "color"
         },
         "rmq": {

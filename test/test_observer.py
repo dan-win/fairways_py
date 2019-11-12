@@ -67,6 +67,9 @@ class StateShapeExplorerTestCase(unittest.TestCase):
         pp = pprint.PrettyPrinter(indent=4)
         pp.pprint(explorer.walk())
     
+from test.test_env import SKIP_EXT_DB_SERVERS
+@unittest.skipIf(SKIP_EXT_DB_SERVERS, 
+    "Skip when test servers are not available in environment")
 class ObserverTestCase(unittest.TestCase):
 
     def test_observer(self):

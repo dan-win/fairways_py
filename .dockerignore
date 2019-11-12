@@ -1,3 +1,4 @@
 /buffer
 ./readme.txt
 ./*.log
+.python-version

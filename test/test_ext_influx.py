@@ -140,4 +140,5 @@ class InfluxDbTestCase(unittest.TestCase):
             {'location': 'us-west', 'measurement': 'mymeasurement', 'temperature': 83}
         ]
 
-        self.assertEqual(result, valid_result_sample)
+        self.assertDictEqual(result[0], valid_result_sample[0])
+        self.assertDictEqual(result[1], valid_result_sample[1])

@@ -86,4 +86,4 @@ class RedisPublishConsumeTestCase(unittest.TestCase):
 
             result = self.helpers.run_asyn(consumer.get_records())
 
-        self.assertEqual(result, [b'TEST_KEY', b'MY MESSAGE'])
+        self.assertListEqual(result, [b'TEST_KEY', b'MY MESSAGE'])

@@ -2,13 +2,21 @@
 *.pyc
 
 # Setuptools distribution folder.
-/dist/
+dist/*
 
 # Python egg metadata, regenerated from source files by setuptools.
-/*.egg-info
+*.egg-info/*
 
 __pycache__/
 build/*
 .python-version
 
+# draft (custom) prefix
 -*
+
+# gitlab-ci:
+builds/*
+cache/*
+
+# tox:
+*.tox/

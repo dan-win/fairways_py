@@ -102,4 +102,4 @@ class SynAmqpPublishConsumeTestCase(unittest.TestCase):
 
             result = consumer.get_records()
 
-        self.assertEqual(result.body, b'{"mydata": "MY MESSAGE"}')
+        self.assertDictEqual(result.body, b'{"mydata": "MY MESSAGE"}')
