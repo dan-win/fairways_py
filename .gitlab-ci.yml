@@ -12,12 +12,12 @@ stages:
   - deploy
   - docs
 
-test:py35:
-  image: python:3.5-slim
-  stage: test
-  script:
-    - pip install -r requirements.txt
-    - python -m unittest
+# test:py35:
+#   image: python:3.5-slim
+#   stage: test
+#   script:
+#     - pip install -r requirements.txt
+#     - python -m unittest
 
 test:py36:
   image: python:3.6-slim
