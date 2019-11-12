@@ -33,12 +33,12 @@ test:py37:
     - pip install -r requirements.txt
     - python -m unittest
 
-test:py38:
-  image: python:3.8-slim
-  stage: test
-  script:
-    - pip install -r requirements.txt
-    - python -m unittest
+# test:py38:
+#   image: python:3.8-slim
+#   stage: test
+#   script:
+#     - pip install -r requirements.txt
+#     - python -m unittest
 
 # deploy_pypi:
 #   image: python:3.6
