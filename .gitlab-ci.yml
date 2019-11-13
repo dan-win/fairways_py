@@ -74,19 +74,19 @@ test:py37:
 #   only:
 #     - /^v\d+\.\d+\.\d+([abc]\d*)?$/  # PEP-440 compliant version (tags)
 
-pages:
-  image: python:3.6
-  stage: docs
-  script:
-    - pip install sphinx sphinx_rtd_theme
-    - pip install -e .
-    - mkdir public
-    - cd docs
-    - make apidocs
-    - make html
-    - cp -r _build/html/* ../public
-  artifacts:
-    paths:
-      - public
-  only:
-    - master
+# pages:
+#   image: python:3.6
+#   stage: docs
+#   script:
+#     - pip install sphinx sphinx_rtd_theme
+#     - pip install -e .
+#     - mkdir public
+#     - cd docs
+#     - make apidocs
+#     - make html
+#     - cp -r _build/html/* ../public
+#   artifacts:
+#     paths:
+#       - public
+#   only:
+#     - master
