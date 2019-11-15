@@ -74,6 +74,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
             )
 
             test_publisher = AmqpPublisher(pub_options, db_alias, AmqpDriver, {})
+            # for i in range(1,10): 
             self.helpers.run_asyn(test_publisher.execute(message=test_message))
 
             options = dict(
@@ -84,5 +85,49 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
 
             result = self.helpers.run_asyn(consumer.get_records())
 
-        self.assertEqual(result.body, b'MY MESSAGE')
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].body, b'MY MESSAGE')
+
+    def test_consume_forewer(self):
+        """
+        """
+        asyncio = self.asyncio
+
+        AmqpConsumer = self.amqp.AmqpConsumer
+        AmqpDriver = self.amqp.AmqpDriver
+
+        AmqpPublisher = self.amqp_pub.AmqpPublisher
+
+        # default=":memory:"
+        db_alias = __name__
+
+        test_message = "MY MESSAGE"
+
+        with unittest.mock.patch.dict('os.environ', {db_alias: self.conn_str}, clear=True):
+
+            pub_options = dict(
+                exchange="fairways",
+            )
+
+            test_publisher = AmqpPublisher(pub_options, db_alias, AmqpDriver, {})
+            # for i in range(1,10): 
+            self.helpers.run_asyn(test_publisher.execute(message=test_message))
+
+            options = dict(
+                queue="fairways",
+                kwargs=dict(timeout=10,encoding='utf-8')
+            )
+            # consumer = AmqpConsumer(options, db_alias, AmqpDriver, {})
+
+            driver = AmqpDriver(db_alias)
+
+            async def run_it(message):
+                print(message)
+
+            driver.on_message(run_it)
+
+            # result = self.helpers.run_asyn(consumer.get_records())
+
+        # self.assertEqual(len(result), 1)
+        # self.assertEqual(result[0].body, b'MY MESSAGE')
 

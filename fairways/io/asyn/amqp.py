@@ -7,6 +7,8 @@ import aio_pika
 import logging
 log = logging.getLogger(__name__)
 
+from typing import Callable
+
 DEFAULT_EXCHANGE_SETTINGS = dict(
     durable = True, 
     auto_delete = False,
@@ -81,16 +83,23 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
             try:
                 await self._ensure_connection()
                 connection = self.engine
-                channel = await connection.channel()    # type: aio_pika.Channel            
+                channel = await connection.channel()    # type: aio_pika.Channel
+
+                await channel.set_qos(prefetch_count=1)
 
                 queue = await channel.declare_queue(queue_name, **queue_settings)
 
                 log.debug("Receiving AMQP message")
 
-                async with queue.iterator() as queue_iter:
-                    async for message in queue_iter:
-                        async with message.process():
-                            return message
+                incoming_message = await queue.get(timeout=5, fail=False)
+                if incoming_message is not None:
+                    return [incoming_message]
+                return []
+
+                # async with queue.iterator() as queue_iter:
+                #     async for message in queue_iter:
+                #         async with message.process():
+                #             return message
 
             except Exception as e:
                 log.error("AMQP operation error: {} at {};".format(e, params))
@@ -100,4 +109,35 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
                     await self.close()
         
         return pull()
+    
+    def on_message(self, queue_name, asyn_c: Callable):
+        async def main_loop():
+            try:
+                await self._ensure_connection()
+                connection = self.engine
+                channel = await connection.channel()    # type: aio_pika.Channel
+
+                await channel.set_qos(prefetch_count=1)
+
+                queue = await channel.declare_queue(queue_name, **queue_settings)
+
+                log.debug("Starting AMQP consumer loop")
+
+                async with queue.iterator() as queue_iter:
+                    async for message in queue_iter:
+                        async with message.process():
+                            await asyn_c(message)
+                            await asyncio.sleep(0.1)
+
+            except Exception as e:
+                log.error("AMQP operation error: {} at {};".format(e, params))
+                raise
+            finally:
+                if self.autoclose:
+                    await self.close()
+        
+        loop = asyncio.get_event_loop()
+        connection = loop.run_until_complete(main_loop())
+
+        loop.run_forever()        
 

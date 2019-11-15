@@ -71,6 +71,29 @@ class Cmd(Channel):
             raise ValueError(f"Cannot find entrypoint by param: {command}")
         return item_to_run.handler()
 
+
+class Listener(Channel):
+
+    @classmethod
+    def asgi_factory(cls):
+        pass
+
+    @classmethod
+    def run(cls, args=None):
+        def run_item(entrypoint_item):
+            pass
+        
+        args = args or sys.argv
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-c',  '--command', required=True, help='Select entrypoint by command param')
+        args = parser.parse_args(args)
+        command = args.command
+
+        item_to_run = cls.chain().find(lambda item: item.meta.get("param") == command).value
+        if not item_to_run:
+            raise ValueError(f"Cannot find entrypoint by param: {command}")
+        return item_to_run.handler()
+
 @register_decorator
 class QA(Channel):
     mark_name = "qa"
