@@ -4,6 +4,9 @@ from .base import (AsyncDataDriver, UriConnMixin)
 import asyncio
 import aio_pika
 
+from fairways.ci.helpers import run_asyn
+from fairways.decorators import (entities, entrypoint)
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -109,35 +112,92 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
                     await self.close()
         
         return pull()
-    
-    def on_message(self, queue_name, asyn_c: Callable):
-        async def main_loop():
-            try:
-                await self._ensure_connection()
-                connection = self.engine
-                channel = await connection.channel()    # type: aio_pika.Channel
 
-                await channel.set_qos(prefetch_count=1)
+    async def consume(self, asyn_c: Callable, **params):
+        queue_name = params["queue"]
+        queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
 
-                queue = await channel.declare_queue(queue_name, **queue_settings)
+        try:
+            await self._ensure_connection()
+            connection = self.engine
+            channel = await connection.channel()    # type: aio_pika.Channel
 
-                log.debug("Starting AMQP consumer loop")
+            await channel.set_qos(prefetch_count=1)
 
-                async with queue.iterator() as queue_iter:
-                    async for message in queue_iter:
-                        async with message.process():
-                            await asyn_c(message)
-                            await asyncio.sleep(0.1)
+            queue = await channel.declare_queue(queue_name, **queue_settings)
 
-            except Exception as e:
-                log.error("AMQP operation error: {} at {};".format(e, params))
-                raise
-            finally:
-                if self.autoclose:
-                    await self.close()
+            log.debug("Starting AMQP consumer loop")
+
+            async with queue.iterator() as queue_iter:
+                async for message in queue_iter:
+                    async with message.process():
+                        await asyn_c(message)
+                        await asyncio.sleep(0.1)
+
+        except Exception as e:
+            log.error("AMQP operation error: {} at {};".format(e, queue_name))
+            raise
+        finally:
+            if self.autoclose:
+                await self.close()
         
-        loop = asyncio.get_event_loop()
-        connection = loop.run_until_complete(main_loop())
 
-        loop.run_forever()        
+    def on_message(self, asyn_c: Callable, **params):
+        run_asyn(self.consume(asyn_c, **params))
 
+@entities.register_decorator
+class Amqp(entrypoint.Listener):
+    mark_name = "amqp"
+    decorator_kwargs = [
+        "queue", 
+        "queue_settings"
+        ]
+    decorator_required_kwargs = [
+        "queue", 
+        ]
+
+    description = "Register AMQP consumer per one queue"
+    once_per_module = False
+
+    @classmethod
+    def run(cls, args=None, new_loop=True):
+        import sys, argparse
+
+        def run_consumer(driver, entrypoint_item):
+            callback = entrypoint_item.handler
+            queue_name = entrypoint_item.meta["queue"]
+            queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
+            return driver.on_message(callback, queue=queue_name, queue_settings=queue_settings)
+
+        args = args or sys.argv
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--amqp', required=True, help='Select AMQP mode')
+        args = parser.parse_args(args)
+        amqp_alias = args.amqp
+
+
+        items_to_run = cls.items()
+        if not items_to_run:
+            raise ValueError("Cannot find amqp entrypoints")
+        
+        driver = AmqpDriver(amqp_alias)
+
+        tasks = asyncio.gather([
+            run_consumer(driver, item)
+            for item in items_to_run
+        ])
+        
+        own_loop = None
+        if new_loop:
+            own_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(own_loop)
+            loop = own_loop
+        else:
+            loop = asyncio.get_event_loop()
+        try:
+            # Note that "gather" wraps results into list:
+            (result,) = loop.run_until_complete(tasks)
+            return result
+        finally:
+            if own_loop:
+                own_loop.close()
