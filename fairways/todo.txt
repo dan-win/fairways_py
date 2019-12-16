@@ -52,3 +52,25 @@ Database drivers - add alternative "connection factory" parameter to constructor
 * pip install OPTION(!) <--> platform feature availability explorer (PFAX)
 
 amqp asyn constants - move from hardcoded to options
+
+SQL drivers - make more clean code:
+===
+    def get_records(self, sql, parameters=None):
+        """
+        Executes the sql and returns a set of records.
+        :param sql: the sql statement to be executed (str) or a list of
+            sql statements to execute
+        :type sql: str or list
+        :param parameters: The parameters to render the SQL query with.
+        :type parameters: mapping or iterable
+        """
+        with closing(self.get_conn()) as conn:
+            with closing(conn.cursor()) as cur:
+                if parameters is not None:
+                    cur.execute(sql, parameters)
+                else:
+                    cur.execute(sql)
+                return cur.fetchall()
+===
+
+network requests - add "raise_for_status" when specific response code required!
