@@ -14,10 +14,12 @@ class AmqpPublisher(BaseQuery, WriterMixin):
     def _transform_params(self, params):
         options = self.template
         message_body = params["message"]
+        headers = params.get("headers", {})
         params = dict(
             exchange=options["exchange"],
             routing_key=options.get("routing_key", None),
-            body=message_body
+            body=message_body,
+            headers=headers
         )
         return params
 

@@ -52,3 +52,30 @@ Database drivers - add alternative "connection factory" parameter to constructor
 * pip install OPTION(!) <--> platform feature availability explorer (PFAX)
 
 amqp asyn constants - move from hardcoded to options
+
+use retry decorator for connections - https://github.com/invl/retry. Example: """
+from retry import retry
+
+
+@retry(pika.exceptions.AMQPConnectionError, delay=5, jitter=(1, 3))
+def consume():
+    connection = pika.BlockingConnection()
+    channel = connection.channel()
+    channel.basic_consume('test', on_message_callback)
+
+    try:
+        channel.start_consuming()
+    # Don't recover connections closed by server
+    except pika.exceptions.ConnectionClosedByBroker:
+        pass
+
+consume()
+
+background option for taskflow decorators.
+
+"""
+
+
+[ ] funcflow.extend - should work clean with case  .extend(defaults, some_data) when some keys are absent 
+
+[ ] connection strings - avoid defaults to detect config errors as soon as possible!!! 
