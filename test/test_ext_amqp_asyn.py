@@ -128,7 +128,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
             async def run_it(message):
                 print(message)
 
-            driver.on_message(run_it, queue="fairways")
+            driver.consume(run_it, queue="fairways")
 
             # result = self.helpers.run_asyn(consumer.get_records())
 
@@ -168,12 +168,12 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
 
             driver = AmqpDriver(db_alias)
 
-            @self.amqp.amqp(queue="fairways")
+            @self.amqp.entrypoint(queue="fairways")
             async def run_it(message):
                 print("LOOP\n", message)
 
             print("################# DECORATOR LOOP")
-            self.amqp.amqp.run(args=["--amqp", db_alias])
+            self.amqp.entrypoint.run(args=["--amqp", db_alias])
             # driver.on_message(run_it, queue="fairways")
 
             # result = self.helpers.run_asyn(consumer.get_records())
