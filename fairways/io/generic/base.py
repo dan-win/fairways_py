@@ -36,6 +36,7 @@ log = logging.getLogger()
 import os
 import sys
 import re
+import itertools
 
 CONF_KEY = "CONNECTIONS"
 
@@ -213,22 +214,46 @@ class ConnectionPool:
 
     @classmethod
     def select(cls, driver_cls, env_varname):
-        connection = cls._pool.get(env_varname)
-        if connection:
-            if driver_cls != connection.__class__:
-                raise ValueError(f"ConnectionPool: connection with name {env_varname} already registered for different class ({driver_cls} vs {connection.__class__})!")
-        else:
-            connection = driver_cls(env_varname)
-            cls._pool[env_varname] = connection
+        max_conn = getattr(driver_cls, "MAX_CONN", 3)
+        pool_for_driver_cls = cls._pool.get(env_varname, None)
 
-        # log.debug("Pool connections: {}".format(cls._pool))
-        return connection
+        if pool_for_driver_cls:
+            if driver_cls != pool_for_driver_cls.driver_cls:
+                raise ValueError(f"ConnectionPool: connection with name {env_varname} already registered for different class ({driver_cls} vs {pool_for_driver_cls.driver_cls})!")
+        else:
+            pool_for_driver_cls = ConnectionPool(driver_cls, env_varname)
+            cls._pool[env_varname] = pool_for_driver_cls
+        
+        return next(pool_for_driver_cls)
     
     @classmethod
     def reset(cls):
         while self._pool:
             name, conn = self._pool.popitem()
             del conn
+    
+    def __init__(self, driver_cls, env_varname):
+        self.connections = []
+        self.driver_cls = driver_cls
+        self.env_varname = env_varname
+        self.max_conn = getattr(driver_cls, "MAX_CONN", 3)
+        self._nested_iter = None
+    
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        "Round-Robin balancing"
+        
+        if len(self.connections) < self.max_conn:
+            connection = self.driver_cls(self.env_varname)
+            self.connections.append(connection)
+            return connection
+
+        if self._nested_iter is None:
+            self._nested_iter = itertools.cycle(self.connections)
+
+        return next(self._nested_iter)
 
 
 class BaseQuery(object):

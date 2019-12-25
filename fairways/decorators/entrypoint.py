@@ -80,19 +80,14 @@ class Listener(Channel):
 
     @classmethod
     def run(cls, args=None):
-        def run_item(entrypoint_item):
-            pass
-        
-        args = args or sys.argv
-        parser = argparse.ArgumentParser()
-        parser.add_argument('-c',  '--command', required=True, help='Select entrypoint by command param')
-        args = parser.parse_args(args)
-        command = args.command
+        raise NotImplementedError()
 
-        item_to_run = cls.chain().find(lambda item: item.meta.get("param") == command).value
-        if not item_to_run:
-            raise ValueError(f"Cannot find entrypoint by param: {command}")
-        return item_to_run.handler()
+class Transmitter(Channel):
+
+    @classmethod
+    def run(cls, args=None):
+        raise NotImplementedError()
+
 
 @register_decorator
 class QA(Channel):

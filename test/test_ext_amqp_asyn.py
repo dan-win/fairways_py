@@ -55,6 +55,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
         # cls.clean_test_db()
         pass
 
+    @unittest.skip("")
     def test_consume(self):
         """
         """
@@ -169,8 +170,9 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
             driver = AmqpDriver(db_alias)
 
             @self.amqp.entrypoint(queue="fairways")
-            async def run_it(message):
-                print("LOOP\n", message)
+            def run_it(message):
+                # print("LOOP\n", message)
+                print("LOOP\n")
 
             print("################# DECORATOR LOOP")
             self.amqp.entrypoint.run(args=["--amqp", db_alias])

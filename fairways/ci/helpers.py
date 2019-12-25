@@ -29,7 +29,7 @@ def getLogger():
     root.addHandler(handler)
     return root
 
-def run_asyn(coro_obj, new_loop=True):
+def run_asyn(coro_obj, new_loop=False):
     import asyncio
     own_loop = None
     if new_loop:
