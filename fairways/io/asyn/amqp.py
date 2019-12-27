@@ -178,7 +178,7 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
                     await asyncio.sleep(0.1)
 
 
-class AsyncAmqpLoop(AsyncLoop):
+class AsyncAmqpConsumerLoop(AsyncLoop):
 
     def __init__(self, driver_instance, decorated_task, **params):
         super().__init__()
@@ -201,7 +201,7 @@ class AsyncAmqpLoop(AsyncLoop):
         This method should be redefined in descendants. 
         This sample is for demo purposes only"""
         # print('relaying {}'.format(message))
-        print(f'{str(self)} relaying {message}')
+        print(f'{str(self)} relaying message')
 
         loop = asyncio.get_event_loop()
 
@@ -210,6 +210,47 @@ class AsyncAmqpLoop(AsyncLoop):
             None, self.decorated_task, message)
         print('default thread pool', result)
         
+
+class AsyncAmqpProducerLoop(AsyncLoop):
+
+    def __init__(self, driver_instance, decorated_task, **params):
+        super().__init__()
+        self.driver_instance = driver_instance
+        self.decorated_task = decorated_task
+        self.params = params
+        
+
+    async def _input_stream(self):
+        """
+        This method should be redefined in descendants. 
+        This sample is for demo purposes only
+        """
+        while True:
+            result = await loop.run_in_executor(
+                None, self.decorated_task, message)
+            yield result
+
+        # params = self.params
+        # async for message in self.driver_instance.message_stream(**params):
+        #     yield message
+
+    async def _output_stream(self, message):
+        """
+        This method should be redefined in descendants. 
+        This sample is for demo purposes only"""
+        # print('relaying {}'.format(message))
+        print(f'{str(self)} relaying message')
+
+        # MOVE TO POOL!!!!!!!!!!!!!!!!!!!!!!
+        print("What I got: ", message)
+        self.driver_instance.execute(message=message)
+
+        # loop = asyncio.get_event_loop()
+
+        # # 1. Run in the default loop's executor:
+        # result = await loop.run_in_executor(
+        #     None, self.decorated_task, message)
+        # print('default thread pool', result)
 
 
 @entities.register_decorator
@@ -226,6 +267,14 @@ class Amqp(entrypoint.Listener):
     description = "Register AMQP consumer per one queue"
     once_per_module = False
 
+    def wrap_taskflow_item(self, driver, entrypoint_item):
+        callback = entrypoint_item.handler
+        queue_name = entrypoint_item.meta["queue"]
+        queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
+        # return driver.consume(callback, queue=queue_name, queue_settings=queue_settings)
+        # return driver._consume_asyn(callback, queue=queue_name, queue_settings=queue_settings)
+        return AsyncAmqpConsumerLoop(driver, callback, queue=queue_name, queue_settings=queue_settings)
+
     @classmethod
     def run(cls, args=None, new_loop=True):
         import sys, argparse
@@ -233,19 +282,19 @@ class Amqp(entrypoint.Listener):
         import functools
         from contextlib import suppress
 
-        async def shutdown(sig, loop):
-            print('caught {0}'.format(sig.name))
-            tasks = [task for task in asyncio.Task.all_tasks() if task is not 
-                    asyncio.tasks.Task.current_task()]
-            print(tasks)
-            for task in tasks:
-                task.cancel()
-                with suppress(asyncio.CancelledError):
-                    print('suppressed error')
-                    await task
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            print('finished awaiting cancelled tasks, results: {0}'.format(results))
-            loop.stop()
+        # async def shutdown(sig, loop):
+        #     print('caught {0}'.format(sig.name))
+        #     tasks = [task for task in asyncio.Task.all_tasks() if task is not 
+        #             asyncio.tasks.Task.current_task()]
+        #     print(tasks)
+        #     for task in tasks:
+        #         task.cancel()
+        #         with suppress(asyncio.CancelledError):
+        #             print('suppressed error')
+        #             await task
+        #     results = await asyncio.gather(*tasks, return_exceptions=True)
+        #     print('finished awaiting cancelled tasks, results: {0}'.format(results))
+        #     loop.stop()
 
         # def run_consumer(driver, entrypoint_item):
         #     callback = entrypoint_item.handler
@@ -253,14 +302,6 @@ class Amqp(entrypoint.Listener):
         #     queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
         #     # return driver.consume(callback, queue=queue_name, queue_settings=queue_settings)
         #     return driver._consume_asyn(callback, queue=queue_name, queue_settings=queue_settings)
-
-        def create_consumer(driver, entrypoint_item):
-            callback = entrypoint_item.handler
-            queue_name = entrypoint_item.meta["queue"]
-            queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
-            # return driver.consume(callback, queue=queue_name, queue_settings=queue_settings)
-            # return driver._consume_asyn(callback, queue=queue_name, queue_settings=queue_settings)
-            return AsyncAmqpLoop(driver, callback, queue=queue_name, queue_settings=queue_settings)
 
         args = args or sys.argv
         parser = argparse.ArgumentParser()
@@ -279,9 +320,9 @@ class Amqp(entrypoint.Listener):
         # asyncio.set_event_loop(loop)
 
         print("======================1")
-        tasks = asyncio.gather(*[
+        tasks_future = asyncio.gather(*[
             # run_consumer(driver, item)
-            create_consumer(driver, item).run(loop)
+            self.wrap_taskflow_item(driver, item).run(loop)
             for item in items_to_run
         ], loop=loop)
         print("======================2")
@@ -297,19 +338,22 @@ class Amqp(entrypoint.Listener):
         try:
             log.debug("Jumping into loop")
             # Note that "gather" wraps results into list:
-            result = loop.run_until_complete(tasks)
+            loop.run_until_complete(tasks_future)
             # return result
-            log.debug("Exiting: %r", result)
-
+            log.debug("Exiting...")
+            print("======================5")
             # Wait for pending tasks:
             pending = asyncio.Task.all_tasks()
-            print("Pending:", pending)
-            print("======================5")
-            loop.run_until_complete(asyncio.gather(*pending))
+            print("Pending:", len(pending))
             print("======================6")
+            pending_future = asyncio.gather(*pending)
+            loop.run_until_complete(pending_future)
+            print("======================7")
 
         # except KeyboardInterrupt:  # pragma: no branch
         #     pass
+        except asyncio.CancelledError as e:
+            print("Intercepted: ", e)
         finally:
 
             result = loop.run_until_complete(driver.close())

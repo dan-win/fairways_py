@@ -1,7 +1,7 @@
 from fairways.io.generic import (DataDriver, UriConnMixin, FileConnMixin)
 
 import asyncio
-
+import concurrent
 import logging
 
 log = logging.getLogger()
@@ -64,6 +64,8 @@ import random
 import signal
 import uuid
 
+from contextlib import suppress
+
 class AsyncLoop:
     
     # __slots__ = ["loop"]
@@ -89,18 +91,26 @@ class AsyncLoop:
             await asyncio.sleep(random.random())
         yield self.SENTINEL
         await asyncio.sleep(random.random())
+    
+    # async def _input_adapter(self):
+
+    async def process_interruption(self):
+        print('waiting for it ...')
+        await self.STOP_EVENT.wait()
+        print('waiting for it ...')
 
     async def _output_stream(self, message):
         """
         This method should be redefined in descendants. 
         This sample is for demo purposes only"""
         # print('relaying {}'.format(message))
-        print(f'{str(self)} relaying {message}')
+        print(f'{str(self)} relaying message')
 
     async def _shutdown(self, sig):
         print(f'\nCaught {sig.name}')
         # print(f'Shutting down {str(self)} ...')
         # stop_event.set()
+        # await queue.put(self.SENTINEL)
         self.STOP_EVENT.set()
         print('Stop event set!...')
         await asyncio.sleep(1)
@@ -111,14 +121,23 @@ class AsyncLoop:
         Note that this method can act as a consumer for external source!
         * Final method *
         """
-        
+        # sel = selectors.DefaultSelector()
+        # sel.register(self.STOP_EVENT)
+        # sel.register(self._input_stream)
+
         async for message in self._input_stream():
+        # async for message in sel.select():
+            # print("Message is: ", message)
             await queue.put(message)
             await asyncio.sleep(random.random())
             # if stop_event.is_set():
+            if message == self.SENTINEL:
+                print(f'Stopping producer for {str(self)}')
+                # await queue.put(self.SENTINEL)
+                break
             if self.STOP_EVENT.is_set():
                 print(f'Stopping producer for {str(self)}')
-                await queue.put(self.SENTINEL)
+                # await queue.put(self.SENTINEL)
                 break
 
     async def process_output(self, queue):
@@ -135,6 +154,7 @@ class AsyncLoop:
                 # the producer emits None to indicate that it is done
                 print("Process output - SENTINEL found, exiting")
                 queue.task_done()
+                # self.STOP_EVENT.set()
                 break
             
             print("Output stream [entering]")
@@ -156,19 +176,41 @@ class AsyncLoop:
         signals = self.STOP_ON_SIGNALS
         for s in signals:
             loop.add_signal_handler(
-                s, lambda: asyncio.ensure_future(self._shutdown(s)))
+                s, lambda: asyncio.ensure_future(self._shutdown(s), loop=loop))
 
         # schedule the consumer
-        consumer = asyncio.ensure_future(self.process_output(queue))
-        # run the producer and wait for completion
-        await self.process_input(queue)
+        consumer = asyncio.ensure_future(self.process_output(queue), loop=loop)
+
+        # schedule producer along with stop listener
+        tasks = [
+            self.process_interruption(), 
+            self.process_input(queue)
+        ]
+
+        finished, unfinished = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, loop=loop)
+        # await self.process_input(queue)
+
+        for task in unfinished:
+            await close_task(task)
+
+        # await asyncio.wait(unfinished)
+
         # wait until the consumer has processed all items
         await queue.join()
+
         # the consumer is still awaiting for an item, cancel it
-        consumer.cancel()
+        close_task(consumer)
 
     def __init__(self):
         self.id = uuid.uuid4()
     
     def __str__(self):
-        return f'Loop {self.id.hex}'
+        return f'Aio Loop {self.id.hex}'
+
+
+async def close_task(task):
+    task.cancel()
+    with suppress(asyncio.CancelledError, concurrent.futures.CancelledError):
+        print('Closing unfinished task', task)
+        await task
+    print("TASK CLOSED: ", task)

@@ -158,8 +158,8 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
             )
 
             test_publisher = AmqpPublisher(pub_options, db_alias, AmqpDriver, {})
-            # for i in range(1,10): 
-            self.helpers.run_asyn(test_publisher.execute(message=test_message))
+            for i in range(1,5):
+                self.helpers.run_asyn(test_publisher.execute(message=test_message))
 
             # options = dict(
             #     queue="fairways",

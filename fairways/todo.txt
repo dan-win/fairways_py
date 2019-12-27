@@ -102,3 +102,6 @@ background option for taskflow decorators.
 [ ] connection strings - avoid defaults to detect config errors as soon as possible!!! 
 
 [ ] "typed" messages instead of dict for "ctx" - remember that class with __slots__ considered more effective than named tuples
+
+[ ] - decide: whether Pool is a Driver behaviour? Use multiple inheritance? 
+
