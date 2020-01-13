@@ -136,7 +136,8 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
         # self.assertEqual(len(result), 1)
         # self.assertEqual(result[0].body, b'MY MESSAGE')
 
-    def test_amqp_decorator(self):
+    @unittest.skip("")
+    def test_amqp_consumer_decorator(self):
         """
         """
         asyncio = self.asyncio
@@ -169,13 +170,79 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
 
             driver = AmqpDriver(db_alias)
 
-            @self.amqp.entrypoint(queue="fairways")
+            @self.amqp.consumer(queue="fairways")
             def run_it(message):
                 # print("LOOP\n", message)
                 print("LOOP\n")
 
             print("################# DECORATOR LOOP")
-            self.amqp.entrypoint.run(args=["--amqp", db_alias])
+            self.amqp.consumer.run(args=["--amqp", db_alias])
+            # driver.on_message(run_it, queue="fairways")
+
+            # result = self.helpers.run_asyn(consumer.get_records())
+
+        # self.assertEqual(len(result), 1)
+        # self.assertEqual(result[0].body, b'MY MESSAGE')
+
+    # @unittest.skip("")
+    def test_amqp_producer_decorator(self):
+        """
+        """
+        asyncio = self.asyncio
+
+        AmqpConsumer = self.amqp_sub.AmqpConsumer
+        AmqpDriver = self.amqp.AmqpDriver
+
+        AmqpPublisher = self.amqp_pub.AmqpPublisher
+
+        # default=":memory:"
+        db_alias = __name__
+
+        test_message = "MY MESSAGE"
+
+        with unittest.mock.patch.dict('os.environ', {db_alias: self.conn_str}, clear=True):
+
+            pub_options = dict(
+                exchange="fairways",
+            )
+
+
+            @self.amqp.producer(exchange="fairways")
+            def publish():
+                print("calling publish()...")
+                return "MY_MESSAGE"
+
+            # test_publisher = AmqpPublisher(pub_options, db_alias, AmqpDriver, {})
+            # for i in range(1,5):
+            #     self.helpers.run_asyn(test_publisher.execute(message=test_message))
+
+            # options = dict(
+            #     queue="fairways",
+            #     kwargs=dict(timeout=10,encoding='utf-8')
+            # )
+            # consumer = AmqpConsumer(options, db_alias, AmqpDriver, {})
+
+            driver = AmqpDriver(db_alias)
+
+            @self.amqp.consumer(queue="fairways")
+            def run_it(message):
+                print("Received:============================>", message)
+                # print("LOOP\n")
+            
+            async def runner():
+                for i in range(1,5):
+                    publish()
+                    await asyncio.sleep(0.1)
+
+            print("################# DECORATOR LOOP")
+            consumers_future = self.amqp.consumer.create_tasks_future(driver, args=["--amqp", db_alias])
+            producers_future = self.amqp.producer.create_tasks_future(driver, args=["--amqp", db_alias])
+            tasks = asyncio.gather(*[producers_future, consumers_future, runner()])
+            async def destructor():
+                print("Closing driver...")
+                await driver.close()
+            result = self.helpers.run_asyn(tasks, destructor)
+
             # driver.on_message(run_it, queue="fairways")
 
             # result = self.helpers.run_asyn(consumer.get_records())

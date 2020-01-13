@@ -31,7 +31,7 @@ from cached_property import cached_property
 from urllib.parse import parse_qs as _parse_qs
 
 import logging
-log = logging.getLogger()
+log = logging.getLogger(__name__)
 
 import os
 import sys

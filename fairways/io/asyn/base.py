@@ -4,7 +4,7 @@ import asyncio
 import concurrent
 import logging
 
-log = logging.getLogger()
+log = logging.getLogger(__name__)
 
 class AsyncDataDriver(DataDriver):
 
@@ -97,7 +97,7 @@ class AsyncLoop:
     async def process_interruption(self):
         print('waiting for it ...')
         await self.STOP_EVENT.wait()
-        print('waiting for it ...')
+        print('STOP EVENT detected!')
 
     async def _output_stream(self, message):
         """
@@ -213,4 +213,82 @@ async def close_task(task):
     with suppress(asyncio.CancelledError, concurrent.futures.CancelledError):
         print('Closing unfinished task', task)
         await task
-    print("TASK CLOSED: ", task)
+    log.debug("Task closed: %s", task)
+
+
+class AsyncEndpoint:
+    """Base class to build endpoint decorators (both consumers and producers).
+    Contains internal management for async loops    
+    """
+
+    @classmethod
+    def driver_factory(cls, args=None):
+        "Should return driver instance (or connection pool instance)"
+        raise NotImplementedError()
+
+    @classmethod
+    def wrap_taskflow_item(cls, driver, entrypoint_item):
+        "Should return instance of AsyncLoop "
+        raise NotImplementedError()
+
+    @classmethod
+    def create_tasks_future(cls, driver, args=None):
+        "Returns awaitable"
+        items_to_run = cls.items()
+        if not items_to_run:
+            raise ValueError("Cannot find amqp entrypoints")
+
+        # driver = cls.driver_factory(args)
+        
+        loop = asyncio.get_event_loop()
+
+        # Note that "gather" wraps results into list:
+        tasks_future = asyncio.gather(*[
+            # run_consumer(driver, item)
+            cls.wrap_taskflow_item(driver, item, loop).run(loop)
+            for item in items_to_run
+        ], loop=loop)
+
+        return tasks_future
+
+    @classmethod
+    def run(cls, args=None):
+
+        # items_to_run = cls.items()
+        # if not items_to_run:
+        #     raise ValueError("Cannot find amqp entrypoints")
+
+        driver = cls.driver_factory(args)
+        
+        loop = asyncio.get_event_loop()
+
+        # # Note that "gather" wraps results into list:
+        # tasks_future = asyncio.gather(*[
+        #     # run_consumer(driver, item)
+        #     cls.wrap_taskflow_item(driver, item, loop).run(loop)
+        #     for item in items_to_run
+        # ], loop=loop)
+
+        tasks_future = cls.create_tasks_future(driver, args)
+
+        try:
+            log.debug("Jumping into loop")
+            loop.run_until_complete(tasks_future)
+            # return result
+            log.debug("Exiting...")
+            # Wait for pending tasks:
+            pending = asyncio.Task.all_tasks()
+            log.debug("Pending: %s", len(pending))
+            pending_future = asyncio.gather(*pending)
+            loop.run_until_complete(pending_future)
+            log.info("Done")
+
+        # except KeyboardInterrupt:  # pragma: no branch
+        #     pass
+        except asyncio.CancelledError as e:
+            log.debug("CancelledError intercepted: %s", e)
+
+        finally:
+            log.debug("Closing driver...")
+            loop.run_until_complete(driver.close())
+            log.debug("Driver closed")

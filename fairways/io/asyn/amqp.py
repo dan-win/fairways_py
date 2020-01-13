@@ -1,4 +1,4 @@
-from .base import (AsyncDataDriver, UriConnMixin)
+from .base import (AsyncDataDriver, UriConnMixin, AsyncEndpoint)
 # Should provice async methods .fetch, .execute
 from fairways.io.asyn.base import AsyncLoop
 
@@ -213,22 +213,23 @@ class AsyncAmqpConsumerLoop(AsyncLoop):
 
 class AsyncAmqpProducerLoop(AsyncLoop):
 
-    def __init__(self, driver_instance, decorated_task, **params):
+    def __init__(self, driver_instance, queue_bus, **params):
         super().__init__()
         self.driver_instance = driver_instance
-        self.decorated_task = decorated_task
+        self.queue_bus = queue_bus
         self.params = params
         
-
     async def _input_stream(self):
         """
-        This method should be redefined in descendants. 
-        This sample is for demo purposes only
+        Read messages from input queue
         """
+        log.debug("Entering input stream... %s", self.queue_bus)
+        queue = self.queue_bus
         while True:
-            result = await loop.run_in_executor(
-                None, self.decorated_task, message)
-            yield result
+            item = await queue.get()
+            log.debug("Message in _input_stream...")
+            queue.task_done()
+            yield item
 
         # params = self.params
         # async for message in self.driver_instance.message_stream(**params):
@@ -236,14 +237,20 @@ class AsyncAmqpProducerLoop(AsyncLoop):
 
     async def _output_stream(self, message):
         """
-        This method should be redefined in descendants. 
-        This sample is for demo purposes only"""
+        """
         # print('relaying {}'.format(message))
-        print(f'{str(self)} relaying message')
+        log.warn(f'{str(self)} relaying message')
 
         # MOVE TO POOL!!!!!!!!!!!!!!!!!!!!!!
         print("What I got: ", message)
-        self.driver_instance.execute(message=message)
+        try:
+            await self.driver_instance.execute(None,
+                exchange=self.params["exchange"],
+                exchange_settings=self.params["exchange_settings"],
+                body=message)
+            print("MESSAGE PUBLISHED TO AMQP")
+        except Exception as e:
+            log.error("AMQP error: %s", e)
 
         # loop = asyncio.get_event_loop()
 
@@ -254,8 +261,8 @@ class AsyncAmqpProducerLoop(AsyncLoop):
 
 
 @entities.register_decorator
-class Amqp(entrypoint.Listener):
-    mark_name = "entrypoint"
+class AmqpConsumerDecorator(AsyncEndpoint, entrypoint.Listener):
+    mark_name = "consumer"
     decorator_kwargs = [
         "queue", 
         "queue_settings"
@@ -267,95 +274,74 @@ class Amqp(entrypoint.Listener):
     description = "Register AMQP consumer per one queue"
     once_per_module = False
 
-    def wrap_taskflow_item(self, driver, entrypoint_item):
-        callback = entrypoint_item.handler
-        queue_name = entrypoint_item.meta["queue"]
-        queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
-        # return driver.consume(callback, queue=queue_name, queue_settings=queue_settings)
-        # return driver._consume_asyn(callback, queue=queue_name, queue_settings=queue_settings)
-        return AsyncAmqpConsumerLoop(driver, callback, queue=queue_name, queue_settings=queue_settings)
-
     @classmethod
-    def run(cls, args=None, new_loop=True):
+    def driver_factory(cls, args=None):
+        "Should return driver instance (or connection pool instance)"
         import sys, argparse
-        import signal
-        import functools
-        from contextlib import suppress
-
-        # async def shutdown(sig, loop):
-        #     print('caught {0}'.format(sig.name))
-        #     tasks = [task for task in asyncio.Task.all_tasks() if task is not 
-        #             asyncio.tasks.Task.current_task()]
-        #     print(tasks)
-        #     for task in tasks:
-        #         task.cancel()
-        #         with suppress(asyncio.CancelledError):
-        #             print('suppressed error')
-        #             await task
-        #     results = await asyncio.gather(*tasks, return_exceptions=True)
-        #     print('finished awaiting cancelled tasks, results: {0}'.format(results))
-        #     loop.stop()
-
-        # def run_consumer(driver, entrypoint_item):
-        #     callback = entrypoint_item.handler
-        #     queue_name = entrypoint_item.meta["queue"]
-        #     queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
-        #     # return driver.consume(callback, queue=queue_name, queue_settings=queue_settings)
-        #     return driver._consume_asyn(callback, queue=queue_name, queue_settings=queue_settings)
-
         args = args or sys.argv
         parser = argparse.ArgumentParser()
         parser.add_argument('--amqp', required=True, help='Select AMQP mode')
         args = parser.parse_args(args)
         amqp_alias = args.amqp
+        return AmqpDriver(amqp_alias)
+
+    @classmethod
+    def wrap_taskflow_item(cls, driver, entrypoint_item, loop):
+        callback = entrypoint_item.handler
+        queue_name = entrypoint_item.meta["queue"]
+        queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
+        return AsyncAmqpConsumerLoop(driver, callback, queue=queue_name, queue_settings=queue_settings)
 
 
-        items_to_run = cls.items()
-        if not items_to_run:
-            raise ValueError("Cannot find amqp entrypoints")
-        
-        driver = AmqpDriver(amqp_alias)
-        
-        loop = asyncio.get_event_loop()
-        # asyncio.set_event_loop(loop)
+#
 
-        print("======================1")
-        tasks_future = asyncio.gather(*[
-            # run_consumer(driver, item)
-            self.wrap_taskflow_item(driver, item).run(loop)
-            for item in items_to_run
-        ], loop=loop)
-        print("======================2")
+@entities.register_decorator
+class AmqpProducerDecorator(AsyncEndpoint, entrypoint.Transmitter):
+    mark_name = "producer"
+    decorator_kwargs = [
+        "exchange", 
+        "queue_settings"
+        ]
+    decorator_required_kwargs = [
+        "exchange", 
+        ]
 
-        print("======================3")
+    description = "Register AMQP producer per one exchange"
+    once_per_module = False
 
-        # signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
-        # for s in signals:
-        #     loop.add_signal_handler(
-        #         s, lambda: asyncio.ensure_future(shutdown(s, loop)))
+    # def __init__(self, *args, **kwargs):
+    #     entrypoint.Transmitter.__init__(self, *args, **kwargs)
+    #     self.queue = asyncio.Queue()
 
-        print("======================4")
-        try:
-            log.debug("Jumping into loop")
-            # Note that "gather" wraps results into list:
-            loop.run_until_complete(tasks_future)
-            # return result
-            log.debug("Exiting...")
-            print("======================5")
-            # Wait for pending tasks:
-            pending = asyncio.Task.all_tasks()
-            print("Pending:", len(pending))
-            print("======================6")
-            pending_future = asyncio.gather(*pending)
-            loop.run_until_complete(pending_future)
-            print("======================7")
+    def __call__(self, subject):
+        # Override inherited 
+        f = entrypoint.Transmitter.__call__(self, subject)
+        queue = asyncio.Queue()
+        # find meta record for subject:
+        subject.queue = queue
+        def wrapper(*args, **kwargs):
+            result = f(*args, **kwargs)
+            queue.put_nowait(result)
+            log.debug("WRAPPER called, result: %s", result)
+            return result
+        return wrapper
 
-        # except KeyboardInterrupt:  # pragma: no branch
-        #     pass
-        except asyncio.CancelledError as e:
-            print("Intercepted: ", e)
-        finally:
+    @classmethod
+    def driver_factory(cls, args=None):
+        "Should return driver instance (or connection pool instance)"
+        import sys, argparse
+        args = args or sys.argv
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--amqp', required=True, help='Select AMQP mode')
+        args = parser.parse_args(args)
+        amqp_alias = args.amqp
+        return AmqpDriver(amqp_alias)
 
-            result = loop.run_until_complete(driver.close())
-            log.debug("Driver closed: %r", result)
-            # loop.close()
+    @classmethod
+    def wrap_taskflow_item(cls, driver, entrypoint_item, loop):
+        # callback = entrypoint_item.handler
+        queue_bus = entrypoint_item.handler.queue
+        exchange_name = entrypoint_item.meta["exchange"]
+        exchange_settings = entrypoint_item.meta.get("exchange_settings", DEFAULT_EXCHANGE_SETTINGS)
+        return AsyncAmqpProducerLoop(driver, queue_bus, exchange=exchange_name, exchange_settings=exchange_settings)
+
