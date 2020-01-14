@@ -232,13 +232,13 @@ class AsyncEndpoint:
         raise NotImplementedError()
 
     @classmethod
-    def create_tasks_future(cls, driver, args=None):
+    def create_tasks_future(cls, args=None):
         "Returns awaitable"
         items_to_run = cls.items()
         if not items_to_run:
             raise ValueError("Cannot find amqp entrypoints")
 
-        # driver = cls.driver_factory(args)
+        driver = cls.driver_factory(args)
         
         loop = asyncio.get_event_loop()
 
@@ -258,7 +258,7 @@ class AsyncEndpoint:
         # if not items_to_run:
         #     raise ValueError("Cannot find amqp entrypoints")
 
-        driver = cls.driver_factory(args)
+        # driver = cls.driver_factory(args)
         
         loop = asyncio.get_event_loop()
 
@@ -269,7 +269,7 @@ class AsyncEndpoint:
         #     for item in items_to_run
         # ], loop=loop)
 
-        tasks_future = cls.create_tasks_future(driver, args)
+        tasks_future = cls.create_tasks_future(args)
 
         try:
             log.debug("Jumping into loop")

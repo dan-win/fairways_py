@@ -136,7 +136,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
         # self.assertEqual(len(result), 1)
         # self.assertEqual(result[0].body, b'MY MESSAGE')
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_amqp_consumer_decorator(self):
         """
         """
@@ -173,7 +173,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
             @self.amqp.consumer(queue="fairways")
             def run_it(message):
                 # print("LOOP\n", message)
-                print("LOOP\n")
+                print("Consumer: got message %s\n" % message)
 
             print("################# DECORATOR LOOP")
             self.amqp.consumer.run(args=["--amqp", db_alias])
@@ -184,7 +184,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
         # self.assertEqual(len(result), 1)
         # self.assertEqual(result[0].body, b'MY MESSAGE')
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_amqp_producer_decorator(self):
         """
         """

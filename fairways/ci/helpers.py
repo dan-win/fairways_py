@@ -57,6 +57,8 @@ def run_asyn(awaitable_obj, destructor=None):
     try:
         log.debug("Jumping into loop")
         # Main loop here:
+        if isinstance(awaitable_obj, (list, tuple)):
+            awaitable_obj = asyncio.gather(*awaitable_obj)
         loop.run_until_complete(awaitable_obj)
         # Main loop done (Ctrl+C, ...), exiting
         log.debug("Exiting...")

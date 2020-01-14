@@ -201,14 +201,14 @@ class AsyncAmqpConsumerLoop(AsyncLoop):
         This method should be redefined in descendants. 
         This sample is for demo purposes only"""
         # print('relaying {}'.format(message))
-        print(f'{str(self)} relaying message')
+        # log.debug(f'{str(self)} relaying message')
 
         loop = asyncio.get_event_loop()
 
         # 1. Run in the default loop's executor:
         result = await loop.run_in_executor(
             None, self.decorated_task, message)
-        print('default thread pool', result)
+        # log.debug(f'default thread pool: {result}')
         
 
 class AsyncAmqpProducerLoop(AsyncLoop):
@@ -241,14 +241,20 @@ class AsyncAmqpProducerLoop(AsyncLoop):
         # print('relaying {}'.format(message))
         log.warn(f'{str(self)} relaying message')
 
+        if isinstance(message, (str, bytes)):
+            params = dict(body=message)
+        elif isinstance(message, dict):
+            params = message
+        else:
+            raise TypeError(f"AmqpPublisher cannot relay this type of message: {type(message)}")
         # MOVE TO POOL!!!!!!!!!!!!!!!!!!!!!!
-        print("What I got: ", message)
+        # print("What I got: ", message)
         try:
             await self.driver_instance.execute(None,
                 exchange=self.params["exchange"],
                 exchange_settings=self.params["exchange_settings"],
-                body=message)
-            print("MESSAGE PUBLISHED TO AMQP")
+                **params)
+            # print("MESSAGE PUBLISHED TO AMQP")
         except Exception as e:
             log.error("AMQP error: %s", e)
 
@@ -278,7 +284,7 @@ class AmqpConsumerDecorator(AsyncEndpoint, entrypoint.Listener):
     def driver_factory(cls, args=None):
         "Should return driver instance (or connection pool instance)"
         import sys, argparse
-        args = args or sys.argv
+        args = args or sys.argv[1:]
         parser = argparse.ArgumentParser()
         parser.add_argument('--amqp', required=True, help='Select AMQP mode')
         args = parser.parse_args(args)
@@ -330,7 +336,7 @@ class AmqpProducerDecorator(AsyncEndpoint, entrypoint.Transmitter):
     def driver_factory(cls, args=None):
         "Should return driver instance (or connection pool instance)"
         import sys, argparse
-        args = args or sys.argv
+        args = args or sys.argv[1:]
         parser = argparse.ArgumentParser()
         parser.add_argument('--amqp', required=True, help='Select AMQP mode')
         args = parser.parse_args(args)
