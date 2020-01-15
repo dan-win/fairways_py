@@ -18,7 +18,7 @@ from fairways.taskflow import Chain
 
 from fairways.funcflow import FuncFlow as ff
 
-from fairways.ci.helpers import run_asyn
+from fairways.io.asyn.base import run_asyn
 
 import logging
 
@@ -48,7 +48,6 @@ def relay_message(message):
 def check_pub_result(result):
     print(f"Step after publish: {type(result)}")
     return result
-
 
 def handle_error(err_info):
     failure = err_info

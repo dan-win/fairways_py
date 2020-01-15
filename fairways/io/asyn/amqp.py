@@ -1,11 +1,10 @@
 from .base import (AsyncDataDriver, UriConnMixin, AsyncEndpoint)
 # Should provice async methods .fetch, .execute
-from fairways.io.asyn.base import AsyncLoop
+from fairways.io.asyn.base import (AsyncLoop, run_asyn)
 
 import asyncio
 import aio_pika
 
-from fairways.ci.helpers import run_asyn
 from fairways.decorators import (entities, entrypoint)
 
 import logging
