@@ -1,6 +1,7 @@
 from .base import (BaseQuery, ReaderMixin, WriterMixin)
 
-from .serde import serialize_json
+from .serde import (serialize_json, deserialize_json)
+import pickle
 import urllib.parse
 
 
@@ -150,7 +151,8 @@ class AmqpPublishQuery(BaseQuery, WriterMixin):
 
     encoders = {
         'application/json': serialize_json,
-        'text/plain': str
+        'text/plain': str,
+        'application/octet-stream': pickle.dumps,
     }
 
     def _transform_params(self, params): # -> dict
@@ -167,10 +169,11 @@ class AmqpPublishQuery(BaseQuery, WriterMixin):
 class AmqpConsumeQuery(BaseQuery, ReaderMixin):
     template_class = AmqpQueueTemplate
 
-    # decoders = {
-    #     'application/json': json.loads,
-    #     'text/plain': str
-    # }
+    decoders = {
+        'application/json': deserialize_json,
+        'text/plain': str,
+        'application/octet-stream': pickle.loads,
+    }
 
     def _transform_params(self, params): # -> dict
         return dict(options=self.template)

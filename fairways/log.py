@@ -49,11 +49,11 @@ DEFAULT_CONF = {
 
     "formatters": {
         "standard": {
-            "format": "%(levelname)-8s %(asctime)s %(message)s"
+            "format": "%(name)s->>> %(levelname)-8s %(asctime)s %(message)s"
         },
         "color": {
             "()": "fairways.helpers.ColoredFormatterFactory",
-            "format_template": "%(log_color)s%(levelname)-8s%(reset)s %(log_color)s%(message)s",
+            "format_template": "%(name)s->>> %(log_color)s%(levelname)-8s%(reset)s %(log_color)s%(message)s",
             "datefmt": None,
             "reset": True,
             "log_colors": {

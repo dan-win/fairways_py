@@ -5,23 +5,25 @@ from .base import (SynDataDriver, UriConnMixin)
 from collections import namedtuple
 
 import pika
+from fairways.decorators import (entities, entrypoint)
+import time
 
 import logging
 log = logging.getLogger(__name__)
 
-# DEFAULT_EXCHANGE_SETTINGS = dict(
-#     durable = True, 
-#     auto_delete = False,
-#     internal = False, 
-#     passive = True,    
-# )
+DEFAULT_EXCHANGE_SETTINGS = dict(
+    durable = True, 
+    auto_delete = False,
+    internal = False, 
+    passive = True,    
+)
 
-# DEFAULT_QUEUE_SETTINGS = dict(
-#     durable = True, 
-#     auto_delete = False,
-#     exclusive = False,
-#     passive = True,    
-# )
+DEFAULT_QUEUE_SETTINGS = dict(
+    durable = True, 
+    auto_delete = False,
+    exclusive = False,
+    passive = True,    
+)
 
 Message = namedtuple("Message", "body,header,method".split(","))
 
@@ -30,7 +32,7 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
     autoclose = True
 
     def is_connected(self):
-        return self.engine is not None
+        return self.engine is not None and not self.engine.is_open
 
     def _connect(self):
         conn_str = self.conn_str
@@ -89,7 +91,7 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
                 channel.basic_ack(method_frame.delivery_tag)
                 # log.warning("Getting JSON??? ******************* %s| %s| %s", method_frame, header_frame, body)
                 # log.warning("Getting JSON??? ******************* %s| %s| %s",header_frame.content_type,header_frame.content_encoding,header_frame.headers)
-                return Message(body=body, header=header_frame, method=method_frame)
+                return [Message(body=body, header=header_frame, method=method_frame)]
             else:
                 print('No message returned')
 
@@ -102,6 +104,105 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
             if self.autoclose:
                 self.close()
         
+
+    def consume(self, callback, **params):
+        queue_name = params["queue"]
+        queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
+        def cb_wrapper(channel, method, properties, body):
+            callback(body)
+            time.sleep(0.1)
+
+        try:
+            # self._ensure_connection()
+            # connection = self.engine
+            # channel = connection.channel()    # type: aio_pika.Channel
+
+            log.warning("Starting AMQP consumer loop")
+
+            while True:
+                # Note this loop for re-connection only!
+                try:
+                    self.close()
+                    self._ensure_connection()
+                    connection = self.engine
+                    # connection = pika.BlockingConnection()
+                    channel = connection.channel()
+                    channel.basic_consume(queue_name, cb_wrapper)
+                    channel.start_consuming()
+                # Don't recover if connection was closed by broker
+                except pika.exceptions.ConnectionClosedByBroker:
+                    break
+                # Don't recover on channel errors
+                except pika.exceptions.AMQPChannelError:
+                    break
+                # Recover on all other connection errors
+                except pika.exceptions.AMQPConnectionError:
+                    continue
+
+
+            # async with queue.iterator() as queue_iter:
+            #     async for message in queue_iter:
+            #         async with message.process():
+            #             await callback(message)
+            #             await asyncio.sleep(0.1)
+
+        except Exception as e:
+            log.error("AMQP operation error: {} at {};".format(e, queue_name))
+            raise
+        finally:
+            if self.autoclose:
+                self.close()
+        
+
+@entities.register_decorator
+class Amqp(entrypoint.Listener):
+    mark_name = "entrypoint"
+    decorator_kwargs = [
+        "queue", 
+        "queue_settings"
+        ]
+    decorator_required_kwargs = [
+        "queue", 
+        ]
+
+    description = "Register AMQP consumer per one queue"
+    once_per_module = False
+
+    @classmethod
+    def run(cls, args=None, new_loop=True):
+        import sys, argparse, functools, uuid
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def run_consumer(driver, entrypoint_item):
+            callback = entrypoint_item.handler
+            queue_name = entrypoint_item.meta["queue"]
+            print("Instance: ", uuid.uuid4(), queue_name)
+            queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
+            return driver.consume(callback, queue=queue_name, queue_settings=queue_settings)
+
+        args = args or sys.argv
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--amqp', required=True, help='Select AMQP mode')
+        args = parser.parse_args(args)
+        amqp_alias = args.amqp
+
+
+        items_to_run = cls.items()
+        if not items_to_run:
+            raise ValueError("Cannot find amqp entrypoints")
+        
+        driver = AmqpDriver(amqp_alias)
+
+        futures = []
+
+        with ThreadPoolExecutor(max_workers=None) as executor:
+            executor.map(functools.partial(run_consumer, driver), items_to_run)
+        #     for item in items_to_run:
+        #         futures.append(executor.submit(run_consumer, driver, item))
+
+        # for f in as_completed(futures):
+        #     if f.exception() is not None:
+        #         print(f.exception())
 
 
 """

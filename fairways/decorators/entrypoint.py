@@ -71,6 +71,24 @@ class Cmd(Channel):
             raise ValueError(f"Cannot find entrypoint by param: {command}")
         return item_to_run.handler()
 
+
+class Listener(Channel):
+
+    @classmethod
+    def asgi_factory(cls):
+        pass
+
+    @classmethod
+    def run(cls, args=None):
+        raise NotImplementedError()
+
+class Transmitter(Channel):
+
+    @classmethod
+    def run(cls, args=None):
+        raise NotImplementedError()
+
+
 @register_decorator
 class QA(Channel):
     mark_name = "qa"
