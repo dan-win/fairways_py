@@ -18,10 +18,11 @@ class FuncFlow(object):
         When attribute itself is a mapping or iterable, it would be copied recursively
 
         :args: 
-            *args: Mapping items to combine their attributes from leftmost to rightmost step-by-step. Note that the leftmost item will be updated during this operation!
+            `*args`: Mapping items to combine their attributes from leftmost to rightmost step-by-step. Note that the leftmost item will be updated during this operation!
         :raises TypeError: Unsupported type
         :return: Mapping where attributes are combined, rightmost args have higher precedence
         :rtype: Mapping
+
         >>> FuncFlow.deep_extend({}, {'name': 'moe'}, {'age': 50}, {'name': 'new'}, {'nested':{'some': 1}})
         {'name': 'new', 'age': 50, {'nested':{'some': 1}}}
         """
@@ -184,6 +185,7 @@ class FuncFlow(object):
         :type value: Any
         :return: Result of test
         :rtype: bool
+
         >>> FuncFlow.contains([1, 2, 3], 3)
         True
         >>> FuncFlow.contains([1, 2, 3], 1000)
@@ -201,6 +203,7 @@ class FuncFlow(object):
         :type iterfunc: Callable
         :return: Mapping where keas are groups and values are items count per group
         :rtype: Dict
+
         >>> FuncFlow.count_by([1, 2, 3, 4, 5], lambda num: 'even' if num % 2 == 0 else 'odd')
         {'odd': 3, 'even': 2}
         """
