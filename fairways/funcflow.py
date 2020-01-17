@@ -68,6 +68,7 @@ class FuncFlow(object):
         :type iterable: Iterable
         :return: List of unique values. Note that values can be out of order
         :rtype: list
+
         >>> FuncFlow.uniq([1, 2, 1, 4, 1, 3])
         [1, 2, 4, 3]
         """
@@ -84,6 +85,7 @@ class FuncFlow(object):
         :type iterfunc: Callable
         :return: Filtered subset
         :rtype: list
+
         >>> FuncFlow.filter([1, 2, 3, 4, 5, 6], lambda v: v % 2 == 0)
         [2,4,6]
         """
@@ -102,6 +104,7 @@ class FuncFlow(object):
         :type memo: Any
         :return: Reduced item (its type depends on type of memo)
         :rtype: Any
+
         >>> FuncFlow.reduce([1, 2, 3], lambda memo, num: memo + num, 0)
         6
         """
@@ -115,9 +118,10 @@ class FuncFlow(object):
         When attribute itself is a mapping or iterable, it would be copied "by reference"
         
         :args: 
-            *args: Mapping items to combine their attributes from leftmost to rightmost step-by-step. Note that the leftmost item will be updated during this operation!
+            \*args: Mapping items to combine their attributes from leftmost to rightmost step-by-step. Note that the leftmost item will be updated during this operation!
         :return: Mapping where attributes are combined, rightmost args have higher precedence
         :rtype: Mapping
+
         >>> FuncFlow.extend({}, {'name': 'moe'}, {'age': 50}, {'name': 'new'})
         {'name': 'new', 'age': 50}
         """
@@ -135,9 +139,10 @@ class FuncFlow(object):
         """Similar to deep_extend, but returns entirely new dict, wwithout modifications in a leftmost item.
         
         :args: 
-            *args: Mapping items to combine their attributes from leftmost to rightmost step-by-step. All items will be unchanged.
+            \*args: Mapping items to combine their attributes from leftmost to rightmost step-by-step. All items will be unchanged.
         :return: Mapping where attributes are combined, rightmost args have higher precedence
         :rtype: Dict
+
         >>> FuncFlow.weld({'name': 'moe'}, {'age': 50}, {'name': 'new'})
         {'name': 'new', 'age': 50}
         """
@@ -149,9 +154,10 @@ class FuncFlow(object):
         
         :param data: Source mapping
         :type data: Mapping
-        :param *keys: List of keys which should not present in result
+        :param \*keys: List of keys which should not present in result
         :return: Mapping where 
         :rtype: Dict
+
         >>> FuncFlow.omit({'name': 'moe', 'age': 50, 'userid': 'moe1'}, 'userid')
         {'name': 'moe', 'age': 50}
         """
@@ -165,9 +171,10 @@ class FuncFlow(object):
         
         :param data: Source mapping
         :type data: Mapping
-        :param *keys: List of keys which should present in result
+        :param \*keys: List of keys which should present in result
         :return: Mapping where 
         :rtype: Dict
+
         >>> FuncFlow.pick({'name': 'moe', 'age': 50, 'userid': 'moe1'}, 'name', 'age')
         {'name': 'moe', 'age': 50}
         """
@@ -241,6 +248,7 @@ class FuncFlow(object):
         :type iterfunc: Callable(Any) -> bool
         :return: Test result
         :rtype: bool
+
         >>> FuncFlow.every([2, 4, 5], lambda num: num % 2 == 0)
         False
         >>> FuncFlow.every([3, 6, 9], lambda num: num % 3 == 0)
@@ -259,6 +267,7 @@ class FuncFlow(object):
         :type iterfunc: Callable(Any) -> bool
         :return: First item which meets criteria
         :rtype: Any
+
         >>> FuncFlow.find([1, 2, 3, 4, 5, 6], lambda num: num % 2 == 0)
         2
         """
@@ -276,6 +285,7 @@ class FuncFlow(object):
         :type iterable: Iterable
         :return: First item which meets criteria
         :rtype: Any
+
         >>> test_data = [
         ...    {"name":"John", "age":25, "occupation":"soldier"},
         ...    {"name":"Jim", "age":30, "occupation":"actor"},
@@ -310,6 +320,7 @@ class FuncFlow(object):
         :type iterfunc: Callable(Any) -> Any
         :return: Entirely new list with modified items
         :rtype: list
+
         >>> FuncFlow.map([1, 2, 3, 4, 5, 6], lambda num: num * 2)
         {"a":2, "b":4, "c":6, "d":8, "e":10, "f":12}
         """
@@ -329,8 +340,9 @@ class FuncFlow(object):
         :raises TypeError: Throws exception if second argument neither callable nor string
         :return: Mapping where keys are groups and values are lists of related items
         :rtype: Dict
-        >>> FuncFlow.group_by(["London", "Paris", "Lissabon", "Perth"], lambda s: s[:1])
-        {'L': ['London', 'Lissabon'], 'P': ['Paris', 'Perth']}
+
+        >>> FuncFlow.group_by(["London", "Paris", "Lisbon", "Perth"], lambda s: s[:1])
+        {'L': ['London', 'Lisbon'], 'P': ['Paris', 'Perth']}
         """
         if iterable is None: return None
         if isinstance(iteratee, str):
@@ -413,7 +425,7 @@ class FuncFlow(object):
         :param object: Source object
         :type object: Any
         :return: Chainable object
-        :rtype: Chain
+        :rtype: funcflow.Chain
         """
         return Chain(object)
     
@@ -491,7 +503,7 @@ class Chain(object):
         :param slice: Count of elements to limit output length, defaults to None
         :type slice: int, optional
         :return: chain object itself, without modification
-        :rtype: Chain
+        :rtype: funcflow.Chain
         """
         data = _align_type(self._data)
         if slice:

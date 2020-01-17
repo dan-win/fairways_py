@@ -303,9 +303,9 @@ class Chain:
         """Append new task (global reducer, which has access to entire structure of data passed to the chain)
         
         :param method: Task function
-        :type method: Callable(Any, **kwargs) -> Any | functools.partial
+        :type method: Callable(Any, \**kwargs) -> Any | functools.partial
         :return: Self reference for chaining
-        :rtype: Chain
+        :rtype: taskflow.Chain
 
         >>> chain = Chain().then(lambda data: data).then(print)
         >>> chain({'a':1})
@@ -324,9 +324,9 @@ class Chain:
         :param keypath: Key name (or key path in a form like "a/b/c")
         :type keypath: str
         :param method: Task function
-        :type method: Callable(Any, **kwargs) -> Any | functools.partial
+        :type method: Callable(Any, \**kwargs) -> Any | functools.partial
         :return: Self reference for chaining
-        :rtype: Chain
+        :rtype: taskflow.Chain
 
         >>> chain = Chain().on("a", lambda value: "changed!").then(print)
         >>> chain({"a": "not changed"})
@@ -352,9 +352,9 @@ class Chain:
         """Add global interceptor to catch Exception
         
         :param method: Interceptor function
-        :type method: Callable(Any, **kwargs) -> Any | functools.partial
+        :type method: Callable(Any, \**kwargs) -> Any | functools.partial
         :return: Self reference for chaining
-        :rtype: Chain
+        :rtype: taskflow.Chain
 
         >>> chain = Chain().then(lambda _: 1/0).catch(lambda _: "error catched!")
         >>> chain("")
@@ -382,11 +382,11 @@ class Chain:
         :param ex_class_or_name: Name or class of a target exception
         :type ex_class_or_name: Class | str
         :param method: Interceptor function
-        :type method: Callable(Any, **kwargs) -> Any | functools.partial
+        :type method: Callable(Any, \**kwargs) -> Any | functools.partial
         :raises ValueError: Prevents of "catch_on" usage for Exception instance (use "catch" for this)
         :raises TypeError: Raised when "ex_class_or_name" has invalid type
         :return: Self reference for chaining
-        :rtype: Chain
+        :rtype: taskflow.Chain
 
         >>> chain = Chain().then(lambda _: 1/0).catch_on(ZeroDivisionError, lambda _: "error catched!")
         >>> chain("")

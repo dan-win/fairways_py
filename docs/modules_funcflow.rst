@@ -1,5 +1,5 @@
 Funcflow
 ========
 
-.. automodule:: funcflow
+.. automodule:: fairways.funcflow
    :members:
