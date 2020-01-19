@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""Driver facade for ScyllaDB/Cassandra.
+
+Requires `DataStax Driver for Apache Cassandra <https://github.com/datastax/python-driver/>`_.
+
+"""
 
 from cassandra.cluster import Cluster as CassandraCluster
 from cassandra.auth import PlainTextAuthProvider as CassandraPlainTextAuthProvider
@@ -17,15 +22,10 @@ log = logging.getLogger(__name__)
 CassandraUriParts = namedtuple('UriParts', 'scheme,user,password,cluster_points,port,keyspace,params'.split(','))
 
 class CassandraConnMixin(UriConnMixin):
+    """Parser for connection string.
+    Works with URI like  `cassandra://user:password@host1--host2--host3:9160/keyspace1`.
+    """
     def _parse_uri(self, conn_uri):
-        """Returns UriParts tuple
-        
-        Arguments:
-            conn_uri {str} -- Connection string in form: cassandra://user:password@host1--host2--host3:9160/keyspace1
-        
-        Returns:
-            [UriParts] -- Parts of uri
-        """
         uri_parts = UriConnMixin._parse_uri(self, conn_uri)
         cluster_points = uri_parts.host.split("--")
         keyspace = uri_parts.path
@@ -39,17 +39,30 @@ class CassandraConnMixin(UriConnMixin):
             uri_parts.params)
 
 class Cassandra(SynDataDriver, CassandraConnMixin):
+    """ScyllaDB/Cassandra driver.
 
-    autoclose = True
+    :param env_varname: Name of enviromnent variable (or settings attribute) which holds connection string (e.g.: "cassandra://user:password@host:9160/keyspace1")
+    :type env_varname: str
+    """
+
+    #: Do not close connection after single request
+    autoclose = False
 
     def __init__(self, env_varname):
+        """Constructor method
+        """
         super().__init__(env_varname)
         self.session = None
 
     def is_connected(self):
+        """Connection status
+        """
+        # TODO: Cassandra: Is there some way to check connection?
         return self.engine is not None
 
     def close(self):
+        """Close all connections.
+        """
         if self.is_connected():
             cluster = self.engine
             cluster.shutdown()
@@ -91,24 +104,36 @@ class Cassandra(SynDataDriver, CassandraConnMixin):
     
 
     def fetch(self, cql):
-        log.debug("Cassandra: CQL fetch: {}".format(cql))
+        """Fetch data from resource
+        
+        :param cql: CQL script to fetch data
+        :type cql: str
+        :return: Result 
+        :rtype: List[Dict]
+        """
+        log.debug("Cassandra: CQL fetch: %s", cql)
         try:
             self._ensure_connection()
             rows = self.session.execute(cql)
             return list(rows) # By defaul returned object has type cassandra.cluster.ResultSet whit can be casted to list
         except Exception as e:
-            log.error("DB operation error: {} at {}".format(e, self.db_name))
+            log.error("DB operation error: %r at %s; %s", e, self.db_name, cql)
             raise
         finally:
             if self.autoclose:
                 self.close()
 
     def change(self, cql):
+        """Change data on resource
+        
+        :param cql: Script to fetch data
+        :type cql: str
+        """
         try:
             self._ensure_connection()
             self.session.execute(cql)
         except Exception as e:
-            log.error("DB operation error: {} at {}; {}".format(e, self.db_name, cql))
+            log.error("DB operation error: %r at %s; %s", e, self.db_name, cql)
             raise
         finally:
             if self.autoclose:

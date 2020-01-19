@@ -203,18 +203,18 @@ class Failure(Exception):
         self.fname = fname 
         self.line = exc_tb.tb_lineno
     
-    def __str__(self):
-        return "Chain failure: {} at method \"{}\" in module {} (line {}) | {}; {}; {}".format(
-            self.exc_type,
-            self.method,
-            self.fname,
-            self.line,
-            self.exception,
-            self.data_before_failure,
-            self.details
+    def __repr__(self):
+        return "Chain failure: {ftype} at method \"{method}\" in module {mod_filename} (line {lineno}) | {exc_instance!r}; {data}; {details}".format(
+            ftype=self.exc_type,
+            method=self.method,
+            mod_filename=self.fname,
+            lineno=self.line,
+            exc_instance=self.exception,
+            data=self.data_before_failure,
+            details=self.details
         )
     
-    def __repr__(self):
+    def __str__(self):
         return "Failure: {}".format(self.exc_type)
 
         # return f"Chain failure: {self.exc_type} at method \"{self.method}\" in module {self.fname} (line {self.line}) | {self.exception!r}; {self.data_before_failure}; {self.details}"
@@ -273,7 +273,8 @@ class Chain:
                     continue # Topic not found
 
                 # log.debug(f"{prefix} Running '{callable_name(method)}'; topic: '{topic}'; envelope: {envelope.state}; getval: {data}")
-                log.debug("{} Running '{}'; topic: '{}'; envelope: {}; getval: {}", prefix, callable_name(method), topic, envelope.state, data)
+                log.debug("%s Running '%s'; topic: '%s'; envelope: %s; getval: %s", 
+                    prefix, callable_name(method), topic, envelope.state, data)
 
                 if middleware:
                     data = middleware(method, data)
@@ -291,7 +292,7 @@ class Chain:
                 failure = Failure(e, data_before_failure, method=callable_name(method), topic=topic)
                 envelope.set_failure({e.__class__.__name__: failure})
                 # log.debug(f"[E] Running '{callable_name(method)}'; topic: '{topic}'; envelope: {envelope.state}")
-                log.debug("[E] Running '{}'; topic: '{}'; envelope: {}", callable_name(method), topic, envelope.state)
+                log.debug("[E] Running '%s'; topic: '%s'; envelope: %r", callable_name(method), topic, envelope.state)
 
         return envelope.get_data()
         

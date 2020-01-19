@@ -4,6 +4,9 @@ Updates catalog in easyrec
 """
 import os, sys
 
+if "./.." not in sys.path:
+    sys.path.append("./..")
+
 import logging
 
 log = logging.getLogger(__name__)
@@ -18,7 +21,7 @@ import urllib
 
 from enum import Enum, IntEnum
 
-import fairways
+# import fairways
 
 from fairways.io.generic import (
     QueriesSet, 
@@ -31,7 +34,7 @@ from fairways.io.syn.sqlite import (
 
 from fairways.decorators import (connection, entrypoint, use)
 
-from fairways.chains import Chain 
+from fairways.taskflow import Chain 
 
 from fairways.funcflow import FuncFlow as ff
 
@@ -40,16 +43,10 @@ from fairways.helpers import rows2dict
 from fairways.ci import (fakedb, utils)
 
 log = logging.getLogger()
-
-
-# class AppState:
-#     def __init__(self):
-#         ticks = 0
-    
-#     def inc(self):
-#         self.tick = 
+logging.basicConfig(level=logging.DEBUG)
 
 db_alias = 'db_sqlite_example'
+os.environ[db_alias] = ":memory:"
 
 @connection.define()
 class ExampleQueriesSet(QueriesSet):
@@ -86,7 +83,7 @@ def start(ctx):
 
 @use.connection('dba')
 def create_table(ctx, dba=None):
-    dba.CREATE_TABLE.execute()
+    result = dba.CREATE_TABLE.execute()
     return ctx
 
 @use.connection('dba')
@@ -97,19 +94,33 @@ def insert_data(ctx, dba=None):
 @use.connection('dba')
 def select_data(ctx, dba=None):
     result = dba.SELECT_DATA.get_records()
-    return {"result": result}
+    return {"records": result}
 
 def handle_error(err_info):
-    log.error("ERROR: %s", err_info)
+    log.error("ERROR: %r", err_info)
 
 def stop(ctx):
-    log.info(f"Database operations done: {ctx}")
-    return {"result": "ok"}
+    log.info("Database operations done: %s", ctx)
+    ctx.update({"result": "ok"})
+    return ctx
 
-@entrypoint.cli()
+chain = Chain("DB example").then(
+        create_table
+    ).then(
+        insert_data
+    ).then(
+        select_data
+    ).then(
+        stop
+    ).catch(
+        handle_error
+    )
+
+@entrypoint.cmd(param='run')
 def run(ctx):
-    log.debug(f"Running @entrypoint.cron...{__name__}")
-    return Chain(start).catch(handle_error).then(stop)
+    log.debug(f"Running @entrypoint.cmd...{__name__}")
+    result = chain({})
+    log.info("Result: %s", result)
 
 @entrypoint.qa()
 def test(ctx):
@@ -118,4 +129,4 @@ def test(ctx):
 
 if __name__ == '__main__':
     ctx = {}
-    run(ctx)
+    entrypoint.cmd.run()

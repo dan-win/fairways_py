@@ -11,25 +11,35 @@ import time
 import logging
 log = logging.getLogger(__name__)
 
-DEFAULT_EXCHANGE_SETTINGS = dict(
-    durable = True, 
-    auto_delete = False,
-    internal = False, 
-    passive = True,    
-)
+# DEFAULT_EXCHANGE_SETTINGS = dict(
+#     durable = True, 
+#     auto_delete = False,
+#     internal = False, 
+#     passive = True,    
+# )
 
-DEFAULT_QUEUE_SETTINGS = dict(
-    durable = True, 
-    auto_delete = False,
-    exclusive = False,
-    passive = True,    
-)
+# DEFAULT_QUEUE_SETTINGS = dict(
+#     durable = True, 
+#     auto_delete = False,
+#     exclusive = False,
+#     passive = True,    
+# )
 
 Message = namedtuple("Message", "body,header,method".split(","))
 
 class AmqpDriver(SynDataDriver, UriConnMixin):
+    """AMQP/RabbitMQ driver.
+    Requires `pika <https://pika.readthedocs.io/en/stable/>`_.
+    
+    :param env_varname: Name of enviromnent variable (or settings attribute) which holds connection string (e.g.: "mysql://user@pass@host/db")
+    :type env_varname: str
+    """
+
+    #: Default connection string (for testing)
     default_conn_str = "amqp://guest:guest@localhost:5672/%2f"
-    autoclose = True
+
+    #: Do not close connection after single request
+    autoclose = False
 
     def is_connected(self):
         return self.engine is not None and not self.engine.is_open
@@ -107,7 +117,8 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
 
     def consume(self, callback, **params):
         queue_name = params["queue"]
-        queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
+        queue_settings = params.get(
+            "queue_settings", DEFAULT_QUEUE_SETTINGS)
         def cb_wrapper(channel, method, properties, body):
             callback(body)
             time.sleep(0.1)
@@ -139,12 +150,6 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
                 except pika.exceptions.AMQPConnectionError:
                     continue
 
-
-            # async with queue.iterator() as queue_iter:
-            #     async for message in queue_iter:
-            #         async with message.process():
-            #             await callback(message)
-            #             await asyncio.sleep(0.1)
 
         except Exception as e:
             log.error("AMQP operation error: {} at {};".format(e, queue_name))

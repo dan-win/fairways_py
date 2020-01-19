@@ -1,4 +1,16 @@
-"Special marks for module executables which plays some special role"
+"""Entrypoint is a function which should handle some kind of external "requests" (different ways of invocation for your application). 
+You can define different entrypoins in one module and associate some specific data with it.
+Example (not functional here, for illustaration purposes only):
+
+>>> # You can invoke this function running "python <yourappname> -c migrate":
+>>> @entrypoint.cli(param="migrate")
+>>> # Later in the "main" part of module we should call entrypoint.cmd.run() to run all registered entrypoins...
+... def make_migration(): pass
+>>> @amqp.consumer(queue="myqueue")
+... def my_counsumer(): pass
+>>> # Later in the "main" part of module we should call amqp.consumer.run() to run all registered entrypoins (or use its async counterpart: amqp.consumer.create_tasks_future())...
+
+Generally, we can define multiple entrypoins per one module. """
 
 from .entities import (Mark, RegistryItem, register_decorator)
 from ..funcflow import FuncFlow as ff
@@ -14,9 +26,15 @@ import sys
 import argparse
 
 class EntrypointRegistryItem(RegistryItem):
+    """Internal container to keep data related to single entrypoint """
 
     @property
     def handler(self):
+        """Wrapped function
+        
+        :return: Decorated function which becomes handler for associated entrypoint
+        :rtype: Callable
+        """
         return self.subject
 
     def __str__(self):
@@ -25,6 +43,11 @@ class EntrypointRegistryItem(RegistryItem):
     @classmethod
     @abstractmethod
     def run(self, args=None):
+        """Invoke all functions decorated by this type of entrypoint.
+        
+        :param args: Some data to init run, defaults to None
+        :type args: Any, optional
+        """
         pass
 
 class Channel(Mark):
@@ -49,6 +72,9 @@ class Cli(Channel):
 
 @register_decorator
 class Cmd(Channel):
+    """Invocation via terminal.
+    Special "param" allows to run selected function only when you provide \-c / \--command argument while starting application.
+    """
     mark_name = "cmd"
     decorator_kwargs = ["param"]
     decorator_required_kwargs = []
@@ -57,19 +83,22 @@ class Cmd(Channel):
 
     @classmethod
     def run(cls, args=None):
+        # TODO: add children parsers to parse context arguments (with displaying help also)
         def run_item(entrypoint_item):
             pass
         
-        args = args or sys.argv
+        args = args or sys.argv[1:]
         parser = argparse.ArgumentParser()
         parser.add_argument('-c',  '--command', required=True, help='Select entrypoint by command param')
+        # parser.add_argument('-f',  '--file', help='File with initial data')
         args = parser.parse_args(args)
         command = args.command
+        print("COMMAND FOUND", command)
 
         item_to_run = cls.chain().find(lambda item: item.meta.get("param") == command).value
         if not item_to_run:
             raise ValueError(f"Cannot find entrypoint by param: {command}")
-        return item_to_run.handler()
+        return item_to_run.handler({})
 
 
 class Listener(Channel):

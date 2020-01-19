@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+"""High-level entities
+"""
 
 __all__ = [
     "set_config_provider",
@@ -14,14 +16,13 @@ __all__ = [
     "UriParts"
 ]
 
-"""High-level entities
-"""
-
 import inspect
 import functools
 from contextlib import contextmanager
 from typing import (List, Dict)
 from collections import namedtuple
+
+from collections.abc import Mapping as AbcMapping
 
 from fairways.decorators import use
 
@@ -37,6 +38,8 @@ import os
 import sys
 import re
 import itertools
+from abc import abstractmethod
+import atexit
 
 CONF_KEY = "CONNECTIONS"
 
@@ -47,6 +50,7 @@ CONF_KEY = "CONNECTIONS"
 RE_URI_TEMPLATE = re.compile(r"(?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>[^\?]*))?(?:\?(?P<params>[^?\n]+))?")
 # (?P<scheme>.*?)://(?:(?P<user>[^:]*):(?P<password>[^@]*)@)?(?P<host>[^:^/]*)(?::(?P<port>[^/|^?]*))?(?:/(?P<path>[^\?]*))?(?:\?(?P<params>[^?\n]+))?
 
+#: URI parts
 UriParts = namedtuple('UriParts', 'scheme,user,password,host,port,path,params'.split(','))
 
 # this is a pointer to the module object instance itself.
@@ -79,12 +83,12 @@ def parse_conn_uri(s):
     """Split uri to parts:
     sheme, use, password, host, port, path.
     Absent parts replaced with None
-    
-    Arguments:
-        s {[str]} -- [uri]
-    
-    Returns:
-        [UriParts] -- [Parsed uri]
+
+    :param s: [description]
+    :type s: str
+    :raises ValueError: uri cannot be parsed with know pattern
+    :return: Parsed uri 
+    :rtype: UriParts
     """
     match = RE_URI_TEMPLATE.match(s)
     if not match:
@@ -97,50 +101,50 @@ def parse_conn_uri(s):
 
 
 class UriConnMixin:
+    """Mixin for Driver subclasses which could be configured with uri-like connection string"""
     def _parse_uri(self, conn_uri):
-        """Returns UriParts tuple
-        
-        Arguments:
-            conn_uri {str} -- [description]
-        
-        Returns:
-            [UriParts] -- Parts of uri
-        """
         log.debug("Parsing uri: %s", conn_uri)
         return parse_conn_uri(conn_uri)
             
 
 class FileConnMixin:
+    """Mixin for Driver subclasses which could be configured with file path (SQLite, etc...) """
     def _parse_uri(self, conn_uri):
-        """Returns UriParts tuple
-        
-        Arguments:
-            conn_uri {str} -- [description]
-        
-        Returns:
-            [UriParts] -- Parts of uri
-        """
         return UriParts(None, None, None, None, None, conn_uri, None)
 
 
 class DataDriver:
-    """Base class for database driver
+    """Base class for IO driver.
+    It should not be instantiated directly (instead it is a base for a real drivers).
+    Implements "low-lewel" interface which manages connection directly.
+    In most cases we use high-level desceendants of BaseQuery.
     
-    Raises:
-        NotImplementedError: [description]
-        NotImplementedError: [description]
-        NotImplementedError: [description]
-    
-    Returns:
-        [type] -- [description]
+    Notes 
+
+    - We do not implement drivers from scratch here - all subsequent drivers are facades for wide-spread packages like PyMySql, etc. But, such facades allow to use common "application protocol" for databases, HTTP resources, AMQP, etc. to make code more consistent.
+    - We can define "read-only" drivers (e.g., HTTP client to fetch some data) or "write-only" drivers (e.g. logger), so it is not necessary to implement both fetch and change methods in descendants.
+
+    :param env_varname: Name of enviromnent variable (or settings attribute) which holds connection string (e.g.: "mysql://user@pass@host/db")
+    :type env_varname: str
     """
+
+    #: Default value for connection string (e.g., it could be ":memory:" for SQLite)
     default_conn_str = ""
+
+    #: Connection should be closed after single query (get_records or execute)
     autoclose = False
 
     _config_provider = os.environ
 
     @classmethod
     def set_config_provider(cls, config_dict):
+        """Assign mapping as a config source
+        
+        :param config_dict: Source mapping. Default value - os.environ 
+        :type config_dict: Mapping
+        :return: Previous value of config provider
+        :rtype: Mapping
+        """
         prev_value = cls._config_provider
         cls._config_provider = config_dict
         return prev_value
@@ -148,15 +152,15 @@ class DataDriver:
     @property
     def db_name(self):
         return self.conn_str.split("/")[-1]
-    
+
+    @abstractmethod    
     def is_connected(self):
-        raise NotImplementedError(f"Override is_connected for {self.__class__.__name__}")
+        """Connection status
+        """
+        pass
     
     def __init__(self, env_varname):
         """Constructor
-        
-        Arguments:
-            env_varname {str} -- Name of enviromnent variable which holds connection string (e.g.: "mysql://user@pass@host/db")
         """
         # "this" points to this module here, see above
         conn_uri_raw = this._config_provider.get(env_varname, self.default_conn_str)
@@ -172,6 +176,11 @@ class DataDriver:
 
     @cached_property
     def qs_params(self):
+        """Named parameters of query string part (after "?" char in URI)
+        
+        :return: Mapping
+        :rtype: Mapping
+        """
         def unwrap(v):
             "Unwrap all lists with single item"
             return v[0] if isinstance(v, list) and len(v) == 1 else v
@@ -181,39 +190,79 @@ class DataDriver:
             return {k:unwrap(v) for k, v in params.items()}
         return {}
 
-    # def fetch(self, sql):
-    #     raise NotImplementedError()
+    @abstractmethod
+    def fetch(self, backend_script):
+        raise NotImplementedError("Fetch operations are not allowed for this class %s" % self.__class__.__name__)
 
-    # def change(self, sql):
-    #     raise NotImplementedError()
+    @abstractmethod
+    def change(self, backend_script):
+        raise NotImplementedError("Change operations are not allowed for this class %s" % self.__class__.__name__)
 
     def get_records(self, query_template, **params):
+        """Read operations for data source.
+        Note: This method is common for sync and async implementations (in latter case it acts as a proxy for awaitable)
+        
+        :param query_template: Backend-specific script to fetch data (e.g., SQL script)
+        :type query_template: str
+        :return: List of results
+        :rtype: List[Dict[..]|NamedTuple]
         """
-        Return list of records. 
-        This method is common for sync and async implementations (in latter case it acts as a proxy for awaitable)
-        """
+
         # Convert all iterables to lists to 
         query = query_template.format(**params).replace('\n', " ").replace("\"", "\'")
-        log.debug("SQL: {}".format(query))
+        log.debug("SQL: %s", query)
         return self.fetch(query)
 
     def execute(self, query_template, **params):
+        """Modify records in storage (i.e. create, update, delete).
+        Note: This method is common for sync and async implementations (in latter case it acts as a proxy for awaitable)
+        
+        :param query_template: Backend-specific script to fetch data (e.g., SQL script)
+        :type query_template: str
+        :return: [description]
+        :rtype: [type]
         """
-        Modify records in storage
-        This method is common for sync and async implementations (in latter case it acts as a proxy for awaitable)
-        """
+
+        # Modify records in storage
+        # This method is common for sync and async implementations (in latter case it acts as a proxy for awaitable)
+
         query = query_template.format(**params)
-        # log.debug("SQL: {}".format(query))
+        # log.debug("SQL: %s", query)
         return self.change(query)
+    
+    @abstractmethod
+    def close(self):
+        """Close connection if alive.
+        Sometimes we should re-define this method because some backends uses .close() while other .shutdown(), etc...
+        """
+        pass
 
 
 
 class ConnectionPool:
+    """Manage number of opened connections to resource 
+
+    :param driver_cls: Driver class to instantiate it inside pool.
+    :type driver_cls: DataDriver subclass
+    :param env_varname: Name of enviromnent variable (or settings attribute) which holds connection string (e.g.: "mysql://user@pass@host/db")
+    :type env_varname: str
+    """
 
     _pool = {}
 
     @classmethod
     def select(cls, driver_cls, env_varname):
+        """Return instance of driver.
+        Selects instance from internal pool or creates new one.
+        
+        :param driver_cls: Driver class to instantiate it inside pool.
+        :type driver_cls: DataDriver subclass
+        :param env_varname: Name of enviromnent variable (or settings attribute) which holds connection string (e.g.: "mysql://user@pass@host/db")
+        :type env_varname: str
+        :raises ValueError: Pool for env_varname already exists
+        :return: Instance of data driver
+        :rtype: DataDriver
+        """
         max_conn = getattr(driver_cls, "MAX_CONN", 3)
         pool_for_driver_cls = cls._pool.get(env_varname, None)
 
@@ -228,11 +277,30 @@ class ConnectionPool:
     
     @classmethod
     def reset(cls):
-        while self._pool:
-            name, conn = self._pool.popitem()
+        """Clean pool
+        """
+        import inspect
+        import asyncio
+        while cls._pool:
+            name, conn = cls._pool.popitem()
+            try:
+                if inspect.isawaitable(conn.close):
+                    loop = asyncio.get_event_loop()
+                    future = asyncio.ensure_future(conn.close())
+                    loop.run_until_complete(future)
+                else:
+                    conn.close()
+            except Exception as e:
+                log.error("Error on connection closing: %s", e)
             del conn
+        log.info("Connection pool is clean now [Ok]")
+
+    #: Alias for method    
+    close = reset
     
     def __init__(self, driver_cls, env_varname):
+        """Constructor method 
+        """
         self.connections = []
         self.driver_cls = driver_cls
         self.env_varname = env_varname
@@ -255,18 +323,28 @@ class ConnectionPool:
 
         return next(self._nested_iter)
 
+@atexit.register
+def close_all_connections():
+    ConnectionPool.close()
 
 class BaseQuery(object):
+    """Base helper to define single operation with backend. 
+    Implements "high-level" interface where connections are managed through connection pool.
+
+    :param template: Template to build resource-specific query for operation. It can contain parameters.
+    :type template: Any
+    :param connection_alias: Connection name, which is related to connectin string in config.
+    :type connection_alias: str
+    :param driver: Driver class to instantiate it inside pool.
+    :type driver: DataDriver subclass
+    :param meta: Any user-defined data to store with this query, defaults to None
+    :type meta: Mapping, optional
+    """
+    #: Default class for templates (e.g., it is str for SqlQuery)
     template_class = None
 
     def __init__(self, template, connection_alias, driver, meta=None):
-        """Creates new instance of Query 
-        
-        Arguments:
-            template {any} -- Template (constant part) of query
-            connection_alias {str} -- Name of environment variable wich holds config
-            driver {DataDriver} -- DataDriver subclass
-            meta {dict} -- Any QA data to store with the task instance
+        """Constructor method
         """
         # self.task_id = 'TASK_ID_DB_FETCH_' + self.name.upper()
         # print("QueriesSet - init instance", self)
@@ -299,18 +377,19 @@ class BaseQuery(object):
 
 class ReaderMixin:
     """Request to read something.
-    Applies to BaseQuery descendants.
+    Applicable to BaseQuery descendants.
     Related to "read" operation.
+
     Note. It can change a state of the source implicitly in some cases (e.g., pop item from queue).
     """
 
-    def get_records(self, **params): # List[Dict[..]|NamedTuple], more: https://stackoverflow.com/a/50038614
-        """Fetch records from associated storage
-        
-        Returns:
-            list -- List of records as a result of query
-        """
+    def get_records(self, **params): 
+        """Fetch records from resource
 
+        \**params: Parameters for request
+        :return: List of records as a result of request/query
+        :rtype: List[Dict[..]|NamedTuple]
+        """
         params = self._transform_params(params)
 
         connection = ConnectionPool.select(self.driver, self.connection_alias)
@@ -324,15 +403,15 @@ class ReaderMixin:
 
 class WriterMixin:
     """Explicit request to "change" (create, update, delete).
-    Applies to BaseQuery descendants.
+    Applicable to BaseQuery descendants.
     """
 
-    def execute(self, **params) -> None: # Throws errors if any
-        """Change data in associated storage
-        
-        Returns:
-            int -- Number of records affected. 
-            This value can be ignored in future
+    def execute(self, **params) -> None:
+        """Change data in resource.
+
+        \**params: Parameters for request
+        :return: Relay result of connection.execute for underlying driver (e.g. it can be number of records affected). This behaviour is driver-specific and can be changed in the future. It would be better to ignore this value.
+        :rtype: Any
         """
 
         params = self._transform_params(params)
@@ -347,16 +426,31 @@ class WriterMixin:
 
 
 class FixtureQuery(BaseQuery):
+    """QA helper which returns fake response and logs requests.
+
+    :param response_dict: Fake response
+    :type response_dict: dict
+    :param name: Name to trace requests in a log, defaults to None
+    :type name: str, optional
+    """
     def __init__(self, response_dict, name=None):
+        """Constructor method
+        """
         self.response_dict = response_dict
         self.name = name
     
     def get_records(self, **sql_params):
-        """ Return fixture data to simulate DB response"""
+        """Return fake data to simulate DB response
+        
+        :return: Fake response
+        :rtype: dict
+        """
         return self.response_dict
     
     def execute(self, *args, **kwargs):
-        """ Dummy execute method"""
+        """Dummy execute method.
+        Writes request details to log.
+        """
         log.info("Fake execute %s: %s %s", self.name, args, kwargs)
 
 
@@ -365,16 +459,106 @@ class debug(type):
         return "{} {}".format(self.__name__, self.enum_queries())
 
 class QueriesSet(metaclass=debug):
-    """Template class to create sets of DB tasks
-    
-    Arguments:
-        object {[type]} -- [description]
-    
-    Returns:
-        [type] -- [description]
+    """Template class to create sets of queries.
+    Note that it descendants used directly as a class without instantiation.
+    Queries should be defined as a class attributes.
+    Subclasses of QueriesSet are "containers" to group queries together.
+    Each application use single QueriesSet which contains different types of queries.
+    Such approach allows to keep task function "clean" by means of "use" injector decorators and simplifies switching between fake (test) and production environment.
+
+    Here is a quick example how we can organize our code:
+
+    .. code-block:: python
+
+        import os
+        from fairways.io.generic import (QueriesSet,SqlQuery)
+        from fairways.io.syn.sqlite import SqLite
+        from fairways.decorators import (connection, entrypoint, use)
+        from fairways.taskflow import Chain 
+
+        # For illustration only:
+        db_alias = 'db_sqlite_example'
+        os.environ[db_alias] = ":memory:"
+
+        @connection.define()
+        class ExampleQueriesSet(QueriesSet):
+
+            CREATE_TABLE = SqlQuery(
+                \"""CREATE TABLE fairways (
+                    id integer primary key,
+                    name varchar
+                );\""", 
+                db_alias, 
+                SqLite,
+                ()
+            )
+
+            INSERT_DATA = SqlQuery(
+                \"""INSERT INTO fairways (id, name) 
+                    VALUES (1, "My Way");\""", 
+                db_alias, 
+                SqLite,
+                ()
+            )
+
+            SELECT_DATA = SqlQuery(
+                \"""SELECT name FROM fairways WHERE id=1;\""", 
+                db_alias, 
+                SqLite,
+                ()
+            )
+
+            # You put here other types of queries here: 
+            # HTTP, Redis, etc. ...
+
+        @use.connection('dba')
+        def create_table(ctx, dba=None):
+            result = dba.CREATE_TABLE.execute()
+            return ctx
+
+        @use.connection('dba')
+        def insert_data(ctx, dba=None):
+            dba.INSERT_DATA.execute()
+            return ctx
+
+        @use.connection('dba')
+        def select_data(ctx, dba=None):
+            result = dba.SELECT_DATA.get_records()
+            return {"result": result}
+
+        def handle_error(err_info):
+            log.error("ERROR: %r", err_info)
+
+        def stop(ctx):
+            log.info("Database operations done: %s", ctx)
+            return {"result": "ok"}
+
+        chain = Chain("DB example").then(
+                create_table
+            ).then(
+                insert_data
+            ).then(
+                select_data
+            ).then(
+                stop
+            ).catch(
+                handle_error
+            )
+
+        @entrypoint.cmd(param='run')
+        def run(ctx):
+            result = chain({})
+            log.info("Result: %s", result)
+
     """
+    
     @classmethod
     def enum_queries(cls):
+        """Enumerate queries.
+
+        :return: Queries defined inside subclass
+        :rtype: List[BaseQuery]
+        """
         queries = []
         for attr_name, attr_value in cls.__dict__.items():
             if isinstance(attr_value, BaseQuery):
@@ -391,3 +575,10 @@ class QueriesSet(metaclass=debug):
     
     def __init__(self):
         raise TypeError("You do not need to instantiate QueriesSet and its subclasses!")
+
+# class BaseQueryTemplate:
+
+#     @abstractmethod
+#     def render(self, *args, **kwargs):
+#         pass
+

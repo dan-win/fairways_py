@@ -13,6 +13,7 @@ class SqLite(SynDataDriver, FileConnMixin):
 
     default_conn_str = ":memory:"
     autoclose = True
+    MAX_CONN = 1
 
     def is_connected(self):
         return self.engine is not None
@@ -23,6 +24,8 @@ class SqLite(SynDataDriver, FileConnMixin):
         engine.row_factory = dict_factory
         engine.isolation_level = "IMMEDIATE"
         self.engine = engine
+        self.__class__.autoclose = db_filename != ":memory:"
+        print("AUTOCLOSE SET TO", self.__class__.autoclose)
 
     def fetch(self, sql):
         cursor = None

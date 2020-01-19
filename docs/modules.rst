@@ -6,5 +6,8 @@ Contents:
 .. toctree::
    :maxdepth: 1
 
-   modules_funcflow
-   modules_taskflow
+   rst/modules_funcflow
+   rst/modules_taskflow
+   rst/package_decorators
+   rst/package_io
+   
