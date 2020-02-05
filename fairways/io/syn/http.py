@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-
+"""HTTP driver.
+Requires `Requests  <https://requests.readthedocs.io/en/master/>`_.
+"""
 import requests
 from requests.auth import HTTPBasicAuth
 import re
@@ -14,10 +16,23 @@ import logging
 log = logging.getLogger(__name__)
 
 class Http(SynDataDriver, UriConnMixin):
+    """HTTP driver.
+    This implementation targeted RESTful services with json response.
+    Supports Basic Auth.
+    
+    :param env_varname: Name of enviromnent variable (or settings attribute) which holds host part of resource (e.g.: "http://user@pass@host:port")
+    :type env_varname: str
+    """
 
     autoclose = False
 
     def is_connected(self):
+        """Connection status.
+        For HTTP we always re-connect per each request
+        
+        :return: Always False
+        :rtype: bool
+        """
         return False
     
     def _connect(self):
@@ -31,7 +46,7 @@ class Http(SynDataDriver, UriConnMixin):
             root_url = f'{root_url}:{uri_parts.port}'
         abs_url = urllib.parse.urljoin(root_url, params.pop("url"))
 
-        log.debug(f'Abs url: {abs_url}')
+        log.debug('Abs url: %s', abs_url)
 
         handler = getattr(requests, params.pop("method"))
 
@@ -47,7 +62,7 @@ class Http(SynDataDriver, UriConnMixin):
         if user and password:
             params["auth"] = HTTPBasicAuth(user, password)
 
-        print("REQUEST PARAMS: %s, %s" % (abs_url, params))
+        log.debug("REQUEST PARAMS: %s, %s", abs_url, params)
 
         response = handler(abs_url, **params )
         response.raise_for_status()

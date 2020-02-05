@@ -70,7 +70,7 @@ DEFAULT_CONF = {
     "loggers": {
         "": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": "DEBUG",
             "formatter": "color"
         },
         "rmq": {

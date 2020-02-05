@@ -2,11 +2,18 @@
 from .base import (SynDataDriver, UriConnMixin)
 # Should provice async methods .fetch, .execute
 
+from fairways.io.generic.net import (
+    AmqpQueueTemplate,
+    AmqpExchangeTemplate
+)
+
 from collections import namedtuple
 
 import pika
 from fairways.decorators import (entities, entrypoint)
 import time
+
+from typing import (List)
 
 import logging
 log = logging.getLogger(__name__)
@@ -18,12 +25,12 @@ log = logging.getLogger(__name__)
 #     passive = True,    
 # )
 
-# DEFAULT_QUEUE_SETTINGS = dict(
-#     durable = True, 
-#     auto_delete = False,
-#     exclusive = False,
-#     passive = True,    
-# )
+DEFAULT_QUEUE_SETTINGS = dict(
+    durable = True, 
+    auto_delete = False,
+    exclusive = False,
+    passive = True,    
+)
 
 Message = namedtuple("Message", "body,header,method".split(","))
 
@@ -55,7 +62,18 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
             self.engine.close()
             self.engine = None
 
-    def execute(self, _, **params):
+    def execute(self, _, *, 
+        message, 
+        routing_key="", 
+        options):
+
+        """Publish message.
+        
+        :param _: Ignored (only for consistency with BaseDriver signature)
+        :type _: Any
+        :raises Exception: Re-raise exceptions of underlying engine
+        """
+        # TODO: 
         message = params["message"]        
         routing_key = params["routing_key"]
         options = params["options"]
@@ -85,7 +103,14 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
                 self.close()
 
 
-    def get_records(self, _, **params):
+    def get_records(self, _, **params) -> List[Message]:
+        """Fetch single message
+        
+        :param _: Ignored (only for consistency with BaseDriver signature)
+        :type _: Any
+        :return: Message
+        :rtype: List[Message] 
+        """
 
         options = params["options"]
         # queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
@@ -103,12 +128,13 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
                 # log.warning("Getting JSON??? ******************* %s| %s| %s",header_frame.content_type,header_frame.content_encoding,header_frame.headers)
                 return [Message(body=body, header=header_frame, method=method_frame)]
             else:
-                print('No message returned')
+                log.debug('No message returned')
+                return []
 
             log.debug("Receiving AMQP message")
 
         except Exception as e:
-            log.error("AMQP operation error: {} at {};".format(e, params))
+            log.error("AMQP operation error: %r at %s;", e, params)
             raise
         finally:
             if self.autoclose:

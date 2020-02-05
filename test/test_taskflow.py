@@ -447,14 +447,19 @@ class TaskFlowTestCase(unittest.TestCase):
             return arg + [4]
 
         def handle_error(error):
+            extype, failure = error.popitem()
             self.log.warning(f">>>>>>>>>>>>>>> Triggered: handle_error: {error}")
+            print("ERROR========================>: ", str(failure), repr(failure))
             error_trace.append("specific catched")
 
         def handle_any_error(error):
+            extype, failure = error.popitem()
             self.log.warning(f">>>>>>>>>>>>>>> Triggered: handle_any_error: {error}")
+            print("ERROR------------------------>: ", repr(failure))
             error_trace.append("catched")
 
         def step4(arg):
+            print("Step 4:", arg)
             return arg + ["always"]
 
         chain = Chain(

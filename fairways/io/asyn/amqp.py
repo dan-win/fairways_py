@@ -1,22 +1,70 @@
-from .base import (AsyncDataDriver, UriConnMixin, AsyncEndpoint)
-# Should provice async methods .fetch, .execute
-from fairways.io.asyn.base import (AsyncLoop, run_asyn)
+from .base import (
+    AsyncDataDriver, 
+    UriConnMixin, 
+    AsyncEndpoint,
+    AsyncLoop,
+    run_asyn
+    )
 
+from fairways.io.generic.net import (
+    AmqpQueueTemplate,
+    AmqpExchangeTemplate
+)
+
+from fairways.funcflow import FuncFlow as ff
+
+import functools
+
+import threading
 import asyncio
 import aio_pika
 
-from typing import Awaitable
+from typing import (
+    Callable, 
+    Awaitable, 
+    NamedTuple, 
+    List,
+    Dict, 
+    Type, 
+    TypeVar, 
+    Optional,
+    Any)
 
 from fairways.decorators import (entities, entrypoint)
 
 import logging
-log = logging.getLogger(__name__)
+log = logging.getLogger()
+log.setLevel(level=logging.DEBUG)
 
-DEFAULT_EXCHANGE_SETTINGS = dict(
-    durable = True, 
-    auto_delete = False,
-    internal = False, 
-    passive = True,    
+# Error with single 
+EIgnoreErrors = (
+
+)
+
+EReconnectOnErrors = (
+
+)
+
+EHaltOnErrors = (
+    aio_pika.exceptions.AMQPChannelError, 
+    aio_pika.exceptions.AMQPConnectionError, 
+    aio_pika.exceptions.AMQPError, 
+    aio_pika.exceptions.AMQPException, 
+    aio_pika.exceptions.AuthenticationError, 
+    *aio_pika.exceptions.CONNECTION_EXCEPTIONS, 
+    aio_pika.exceptions.ChannelClosed, 
+    aio_pika.exceptions.ChannelNotFoundEntity, 
+    aio_pika.exceptions.ChannelPreconditionFailed, 
+    aio_pika.exceptions.ConnectionClosed, 
+    aio_pika.exceptions.DeliveryError, 
+    aio_pika.exceptions.DuplicateConsumerTag, 
+    aio_pika.exceptions.IncompatibleProtocolError, 
+    aio_pika.exceptions.InvalidFrameError, 
+    aio_pika.exceptions.MessageProcessError, 
+    aio_pika.exceptions.MethodNotImplemented, 
+    *aio_pika.exceptions.PAMQP_EXCEPTIONS, 
+    aio_pika.exceptions.ProbableAuthenticationError, 
+    aio_pika.exceptions.ProtocolSyntaxError, 
 )
 
 DEFAULT_QUEUE_SETTINGS = dict(
@@ -25,6 +73,140 @@ DEFAULT_QUEUE_SETTINGS = dict(
     exclusive = False,
     passive = True,    
 )
+
+#: Types:
+MessageBody = TypeVar('MessageBody', str, bytes)
+ConnectionFactory = Callable[[], Awaitable[aio_pika.connection.Connection]]
+ChannelFactory = Callable[[aio_pika.connection.Connection], Awaitable[aio_pika.channel.Channel]]
+AmqpQueueFactory = Callable[[aio_pika.channel.Channel], Awaitable[aio_pika.queue.Queue]]
+AmqpExchangeFactory = Callable[[aio_pika.channel.Channel], Awaitable[aio_pika.exchange.Exchange]]
+
+class AmqpQueueRecord(NamedTuple):
+    channel: aio_pika.channel.Channel
+    queue: aio_pika.queue.Queue
+    # # Only for checking:
+    # queue_settings: Dict[str, Any]
+
+class AmqpExchangeRecord(NamedTuple):
+    channel: aio_pika.channel.Channel
+    exchange: aio_pika.exchange.Exchange
+    # # Only for checking:
+    # exchange_settings: Dict[str, Any]
+
+class ConnectionRecord(NamedTuple):
+    """ Container for connections and related channels """
+
+    connection: Optional[aio_pika.connection.Connection]
+    # channel_recs: Dict[str, Union[AmqpQueueRecord, AmqpExchangeRecord]]
+    queue_channels: Dict[str, AmqpQueueRecord]
+    exchange_channels: Dict[str, AmqpExchangeRecord]
+
+    async def _close_items(reg: Dict[str, Any]):
+        while reg:
+            (name, channel_record) = reg.popitem()
+            try:
+                await channel_record.channel.close()
+            except Exception as e:
+                log.debug('Error closing channel: %s', name)
+
+    async def close_exchanges(self):
+        """Close exchange channels for this connection
+        """
+        await self._close_items(self.exchange_channels)
+
+    async def close_queues(self):
+        """Close queue channels for this connection
+        """
+        await self._close_items(self.queue_channels)
+    
+    async def close_channel(self, name: str):
+        async def try_close(reg):
+            channel_rec = reg.get(name)
+            if channel_rec is not None:
+                await channel_rec.connection.close()
+                del reg[name]
+        await try_close(self.queue_channels)
+        await try_close(self.exchange_channels)
+    
+    async def get_exchange(self, *, 
+            exchange_name: str,
+            exchange_settings: Dict[str, Any]) -> aio_pika.exchange.Exchange:
+
+        channel_rec = self.exchange_channels.get(exchange_name)
+        if channel_rec is None:
+            channel = await self.connection.channel()
+            exchange = await channel.declare_exchange(
+                    exchange_name, **exchange_settings)
+            channel_rec = AmqpExchangeRecord(channel, exchange)
+        return channel_rec.exchange
+
+    async def get_queue(self, 
+            queue_name: str, *,
+            queue_settings: Dict[str, Any]) -> aio_pika.queue.Queue:
+
+        channel_rec = self.queue_channels.get(queue_name)
+        if channel_rec is None:
+            channel = await self.connection.channel()
+            await channel.set_qos(prefetch_count=1)
+            queue = await channel.declare_queue(queue_name, **queue_settings)
+            channel_rec = AmqpQueueRecord(channel, queue)
+        return channel_rec.queue
+
+    def get_names(self):
+        return list(self.queue_channels.keys()) + list(self.exchange_channels.keys())
+
+class ConnRegistry:
+    """ Registry for all connections and their channels.
+    Structure:
+    One connection per thread
+    Seperate channels for producers and consumers
+    One channel per queue/exchange name
+    """
+    def __init__(self, amqp_url: str):
+        self.connection_by_thread = {}
+        self.amqp_url = amqp_url
+    
+    def get_current_connection_rec(self) -> Optional[ConnectionRecord]:
+        """Connection for current thread
+        
+        :return: Current connection if any
+        :rtype: Optional[ConnectionRecord]
+        """
+        tid = threading.get_ident()
+        return self.connection_by_thread.get(tid)
+    
+    async def get_connection_rec(self) -> ConnectionRecord:
+        """Retrieve existing connection for current thread or create new if necessary
+        
+        :param connection_factory: Factory function (without parameters)
+        :type connection_factory: Awaitable
+        :return: Connection record
+        :rtype: ConnectionRecord
+        """
+        # Keep 1 connection per thread
+        tid = threading.get_ident()
+        conn_rec = self.connection_by_thread.get(tid)
+        if conn_rec is None:
+            # conn_obj = await connection_factory()
+            conn_obj = await aio_pika.connect(self.amqp_url)
+            conn_rec = ConnectionRecord(conn_obj, {}, {})
+            self.connection_by_thread[tid] = conn_rec
+        return conn_rec
+        
+    def connections_rec_list(self) -> List[ConnectionRecord]:
+        """List of connections for all threads
+        
+        :return: List of records
+        :rtype: List[ConnectionRecord]
+        """
+        return list(self.connection_by_thread.values())
+
+    async def close_current_connection(self):
+        tid = threading.get_ident()
+        connection = self.connection_by_thread.get(tid)
+        if connection is not None:
+            await connection.close()
+            del self.connection_by_thread[tid]
 
 class AmqpDriver(AsyncDataDriver, UriConnMixin):
     """AMQP/RabbitMQ driver.
@@ -40,104 +222,125 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
     #: Do not close connection after single request
     autoclose = False
 
+
     def is_connected(self) -> bool:
         """Connection alive flag
         
         :return: True when connected
         :rtype: bool
         """
-        return self.engine is not None and not self.engine.is_closed
+        raise NotImplementedError("Should not be called, AMQP driver uses another approach")
+        # return self.engine is not None and not self.engine.is_closed
 
     async def _connect(self):
-        conn_str = self.conn_str
-        engine = await aio_pika.connect(conn_str)
-        self.engine = engine
+        # conn_str = self.conn_str
+        # engine = await aio_pika.connect(conn_str)
+        # self.engine = engine
+        # channel = await engine.channel()
+        # self.channel = channel
+        raise NotImplementedError("Should not be called, AMQP driver uses another approach")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._connections_registry = ConnRegistry(self.conn_str)
 
     async def close(self) -> None:
         """Close connection. 
-        Does nothing if alreqdy closed.
+        Does nothing if already closed.
         """
-        if self.is_connected():
-            await self.engine.close()
-            self.engine = None
+        conn_rec = self._connections_registry.get_current_connection_rec()
+        if conn_rec is not None:
+            await conn_rec.close_queues()
+            await conn_rec.close_exchanges()
+        # if self.is_connected():
+        #     await self.channel.close()
+        #     self.channel = None
+        #     await self.engine.close()
+        #     self.engine = None
 
-    def execute(self, _, **params) -> Awaitable:
+    def execute(self, _, *,
+            body: MessageBody, 
+            exchange: str,
+            exchange_settings=None,
+            routing_key:str=None,
+            headers:Dict=None,
+            content_type:str=None
+            ) -> Awaitable:
         """Returns awaitable which should publish message.
         
         :param _: Ignored (only for consistency with BaseDriver signature)
         :type _: Any
         :raises Exception: Re-raise exceptions of underlying engine
-        :return: Exception
+        :return: Awaitable to publish message
         :rtype: Awaitable
         """
 
+        exchange_settings = exchange_settings or AmqpExchangeTemplate.default_exchange_settings()
+        routing_key = routing_key or ""
+        message = body
+        headers = headers or {}
+        content_type = content_type or "text/plain"
+        exchange_name = exchange
+        if isinstance(message, str):
+            body = message.encode()
+        elif isinstance(message, bytes):
+            body = message # Ok
+        else:
+            raise Exception(f"Unsupported type of message: {type(message)}")
+
         async def push():
-            exchange_name = params["exchange"]
-            exchange_settings = params.get("exchange_settings", DEFAULT_EXCHANGE_SETTINGS)
-            routing_key = params.get("routing_key") or ""
-            message = params["body"]
-            headers = params.get("headers", {})
+
+            connection_rec = await self._connections_registry.get_connection_rec()
+            exchange = await connection_rec.get_exchange(
+                exchange_name = exchange_name, 
+                exchange_settings=exchange_settings)
 
             try:
-                await self._ensure_connection()
-                connection = self.engine
-                channel = await connection.channel()    # type: aio_pika.Channel            
-
-                exchange = await channel.declare_exchange(exchange_name, **exchange_settings)
-
                 log.debug("Sending AMQP message")
-
-                if isinstance(message, str):
-                    message=message.encode()
-                elif isinstance(message, bytes):
-                    pass # Ok
-                else:
-                    raise Exception(f"Unsupported type of message: {type(message)}")
 
                 await exchange.publish(
                     aio_pika.Message(
-                        body=message,
+                        body=body,
                         headers=headers,
+                        content_type=content_type
                     ),
                     routing_key=routing_key
                 )
 
             except Exception as e:
-                log.error("AMQP operation error: {} at {};".format(e, params))
+                log.error("AMQP operation error: %r at %s;", e, params)
                 raise
-            finally:
-                if self.autoclose:
-                    await self.close()
         
         return push()
 
 
-    def get_records(self, _, **params) -> Awaitable:
+    def get_records(self, _, *, 
+            queue_name, 
+            queue_settings=None) -> Awaitable:
         """Returns awaitable which should consume messages.
         
         :param _: Ignored (only for consistency with BaseDriver signature)
         :type _: Any
         :raises Exception: Re-raise exceptions of underlying engine
-        :return: Exception
+        :return: Awaitable to fetch message
         :rtype: Awaitable
         """
+        queue_settings = ff.weld(queue_settings or {}, AmqpQueueTemplate.default_queue_settings())
+        # queue_settings = queue_settings or AmqpQueueTemplate.default_queue_settings()
 
         async def pull():
-            queue_name = params["queue"]
-            queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
-
             try:
-                await self._ensure_connection()
-                connection = self.engine
-                channel = await connection.channel()    # type: aio_pika.Channel
-
-                await channel.set_qos(prefetch_count=1)
-
-                queue = await channel.declare_queue(queue_name, **queue_settings)
-
+                connection_rec = await self._connections_registry.get_connection_rec()
+                queue = await connection_rec.get_queue(
+                    queue_name=queue_name, 
+                    queue_settings=queue_settings)
+            except Exception as e:
+                log.error("ERROR on Queue: %r", e)
+                raise
+            try:
                 log.debug("Receiving AMQP message")
 
-                incoming_message = await queue.get(timeout=5, fail=False)
+                incoming_message = await queue.get(queue_settings["timeout"], fail=False)
                 if incoming_message is not None:
                     return [incoming_message]
                 return []
@@ -148,11 +351,8 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
                 #             return message
 
             except Exception as e:
-                log.error("AMQP operation error: {} at {};".format(e, params))
+                log.error("AMQP operation error: %r at %s;", e, params)
                 raise
-            finally:
-                if self.autoclose:
-                    await self.close()
         
         return pull()
 
@@ -190,6 +390,7 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
         
 
     def consume(self, asyn_c, **params):
+        # Use in consumer decorator directly???
         """Run consumer with callback. 
         This is blocking function.
         Tentative feature.
@@ -199,25 +400,29 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
         """
         run_asyn(self._consume_asyn(asyn_c, **params))
 
-    async def message_stream(self, **params):
+    async def input_stream(self, *, 
+            queue_name, 
+            queue_settings=None):
+        
         """Message stream.
         Used in AsynAmqpConsumerLoop.
         
         :yield: Next message
         :rtype: aiopika.IncomingMessage
         """
-        queue_name = params["queue"]
-        queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
+        
+        queue_settings = ff.weld(queue_settings or {}, AmqpQueueTemplate.default_queue_settings())
 
-        await self._ensure_connection()
-        connection = self.engine
-        channel = await connection.channel()    # type: aio_pika.Channel
+        try:
+            connection_rec = await self._connections_registry.get_connection_rec()
+            queue = await connection_rec.get_queue(
+                queue_name=queue_name, 
+                queue_settings=queue_settings)
+        except Exception as e:
+            log.error("QUEUE ERROR: %r", e)
+            raise
 
-        await channel.set_qos(prefetch_count=1)
-
-        queue = await channel.declare_queue(queue_name, **queue_settings)
-
-        log.debug("Starting AMQP consumer loop")
+        log.debug("AmqpDriver: Starting AMQP consumer loop")
 
         async with queue.iterator() as queue_iter:
             async for message in queue_iter:
@@ -225,93 +430,147 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
                     yield message
                     await asyncio.sleep(0.1)
 
+    async def output_stream(self, *, 
+            aio_queue: asyncio.Queue,
+            exchange_name: str,
+            exchange_settings: Dict[str, Any]=None,
+            ):
+
+        exchange_settings = exchange_settings or AmqpExchangeTemplate.default_exchange_settings()
+        keep_running = True
+        log.debug("AmqpDriver: Starting AMQP producer loop")
+        while keep_running:
+            # Outer loop for reliable connection
+            
+            log.debug("AmqpDriver.output_stream [entering loop]")
+            try:
+                connection_rec = await self._connections_registry.get_connection_rec()
+                exchange = await connection_rec.get_exchange(
+                    exchange_name=exchange_name, 
+                    exchange_settings=exchange_settings)
+            except Exception as e:
+                log.error("CONN ERROR: %r", e)
+                raise
+
+            try:
+                while True:
+                    log.debug("Waiting for message")
+                    message = await aio_queue.get()
+                    if message == AsyncAmqpProducerLoop.SENTINEL:
+                        log.debug("Sentinel occurs in driver output stream")
+                        keep_running = False
+                        break
+                    log.debug("Message occurs: %s", message)
+                    if not isinstance(message, dict):
+                        log.error("Message should be a dict, but type is %s", type(message))
+                        continue
+
+                    body = message["body"]
+                    routing_key = message.get("routing_key", "")
+                    headers = message.get("headers", {})
+                    content_type = message.get("content_type", "text/plain")
+
+                    if isinstance(body, str):
+                        body=body.encode()
+
+                    await exchange.publish(
+                        aio_pika.Message(
+                            body=body,
+                            headers=headers,
+                            content_type=content_type
+                        ),
+                        routing_key=routing_key
+                    )
+
+                    aio_queue.task_done()
+
+            except asyncio.CancelledError:
+                log.debug("AmqpDriver.output_stream - Cancelling [exiting loop]")
+                keep_running = False
+                break
+
+            except Exception as e:
+                # TODO: amqp.py: Refactor recommection loop and use same approach for input_stream()!!!!!!
+                log.error("EXCEPTION occurs: %s", e)
+                e_cls = e.__class__
+                if e_cls in EIgnoreErrors:
+                    log.warning("AmqpDriver.output_stream: EIgnoreErrors condition")
+                    pass
+                elif e_cls in EReconnectOnErrors:
+                    # TODO: close exchange channel and / or connection
+                    log.warning("AmqpDriver.output_stream: EReconnectOnErrors condition")
+                    pass
+                else:
+                    log.debug("AmqpDriver.output_stream [exiting loop]")
+                    keep_running = False
+                    break
+
+
 
 class AsyncAmqpConsumerLoop(AsyncLoop):
 
-    def __init__(self, driver_instance, decorated_task, **params):
+    def __init__(self, driver_instance, decorated_task, *, queue_name, queue_settings):
         super().__init__()
         self.driver_instance = driver_instance
         self.decorated_task = decorated_task
-        self.params = params
+        self.queue_name = queue_name
+        self.queue_settings = queue_settings
         
-
     async def input_stream(self):
-        """
-        This method should be redefined in descendants. 
-        This sample is for demo purposes only
-        """
-        params = self.params
-        async for message in self.driver_instance.message_stream(**params):
-            yield message
+        async for message in self.driver_instance.input_stream(queue_name=self.queue_name, queue_settings=self.queue_settings):
+            try:
+                yield message
+            except asyncio.CancelledError:
+                yield self.SENTINEL
+                break
 
     async def output_stream(self, message):
-        """
-        This method should be redefined in descendants. 
-        This sample is for demo purposes only"""
-        # print('relaying {}'.format(message))
-        # log.debug(f'{str(self)} relaying message')
 
         loop = asyncio.get_event_loop()
 
         # 1. Run in the default loop's executor:
         result = await loop.run_in_executor(
             None, self.decorated_task, message)
-        # log.debug(f'default thread pool: {result}')
+        log.debug('Task flow result ready: %s', result)
         
 
 class AsyncAmqpProducerLoop(AsyncLoop):
 
-    def __init__(self, driver_instance, queue_bus, **params):
+    def __init__(self, driver_instance, queue_bus, *, 
+            exchange_name, 
+            exchange_settings=None):
         super().__init__()
         self.driver_instance = driver_instance
         self.queue_bus = queue_bus
-        self.params = params
+        self.exchange_name = exchange_name
+        self.exchange_settings = exchange_settings
         
     async def input_stream(self):
-        """
-        Read messages from input queue
-        """
-        log.debug("Entering input stream... %s", self.queue_bus)
-        queue = self.queue_bus
-        while True:
-            item = await queue.get()
-            log.debug("Message in input_stream...")
-            queue.task_done()
-            yield item
+        while not self.GLOBAL_STOP_EVENT.is_set():
+            try:
+                item = await self.queue_bus.get()
+                log.debug("Message in input_stream...")
+                self.queue_bus.task_done()
+                if item == self.SENTINEL:
+                    break
+                # TODO: message implicit typecast - restore
+                if isinstance(item, (str, bytes)):
+                    item = dict(body=item)
+                yield item
+            except asyncio.CancelledError:
+                log.info("AsyncAmqpProducerLoop.process_input cancelled")
+                break
 
-        # params = self.params
-        # async for message in self.driver_instance.message_stream(**params):
-        #     yield message
+    async def process_output(self, queue:asyncio.Queue):
+        await self.driver_instance.output_stream(
+            # aio_queue=self.queue_bus,
+            aio_queue=queue,
+            exchange_name=self.exchange_name,
+            exchange_settings=self.exchange_settings,
+        )
 
     async def output_stream(self, message):
-        """
-        """
-        # print('relaying {}'.format(message))
-        log.warn(f'{str(self)} relaying message')
-
-        if isinstance(message, (str, bytes)):
-            params = dict(body=message)
-        elif isinstance(message, dict):
-            params = message
-        else:
-            raise TypeError(f"AmqpPublisher cannot relay this type of message: {type(message)}")
-        # MOVE TO POOL!!!!!!!!!!!!!!!!!!!!!!
-        # print("What I got: ", message)
-        try:
-            await self.driver_instance.execute(None,
-                exchange=self.params["exchange"],
-                exchange_settings=self.params["exchange_settings"],
-                **params)
-            # print("MESSAGE PUBLISHED TO AMQP")
-        except Exception as e:
-            log.error("AMQP error: %s", e)
-
-        # loop = asyncio.get_event_loop()
-
-        # # 1. Run in the default loop's executor:
-        # result = await loop.run_in_executor(
-        #     None, self.decorated_task, message)
-        # print('default thread pool', result)
+        raise NotImplementedError("Should not be called")
 
 
 @entities.register_decorator
@@ -353,6 +612,7 @@ class AmqpConsumerDecorator(AsyncEndpoint, entrypoint.Listener):
     @classmethod
     def driver_factory(cls, args=None):
         "Should return driver instance (or connection pool instance)"
+        # TODO: move from Driver to ConnectionPool
         import sys, argparse
         args = args or sys.argv[1:]
         parser = argparse.ArgumentParser()
@@ -362,12 +622,17 @@ class AmqpConsumerDecorator(AsyncEndpoint, entrypoint.Listener):
         return AmqpDriver(amqp_alias)
 
     @classmethod
-    def wrap_taskflow_item(cls, driver, entrypoint_item, loop):
+    def wrap_taskflow_item(cls, driver, entrypoint_item):
         "Awaitable for underlying consumer loop"
         callback = entrypoint_item.handler
         queue_name = entrypoint_item.meta["queue"]
-        queue_settings = entrypoint_item.meta.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
-        return AsyncAmqpConsumerLoop(driver, callback, queue=queue_name, queue_settings=queue_settings)
+        queue_settings = entrypoint_item.meta.get("queue_settings")
+        queue_settings = ff.weld(queue_settings or {}, AmqpQueueTemplate.default_queue_settings())
+        return AsyncAmqpConsumerLoop(
+            driver, 
+            callback, 
+            queue_name=queue_name, 
+            queue_settings=queue_settings)
 
 
 @entities.register_decorator
@@ -410,19 +675,17 @@ class AmqpProducerDecorator(AsyncEndpoint, entrypoint.Transmitter):
     description = "Register AMQP producer per one exchange"
     once_per_module = False
 
-    # def __init__(self, *args, **kwargs):
-    #     entrypoint.Transmitter.__init__(self, *args, **kwargs)
-    #     self.queue = asyncio.Queue()
-
     def __call__(self, subject):
         # Override inherited 
         f = entrypoint.Transmitter.__call__(self, subject)
         queue = asyncio.Queue()
-        # find meta record for subject:
+        # TODO: use Queue registry mapped to callable instead of "dynamic attribute"
         subject.queue = queue
+        loop = asyncio.get_event_loop()
         def wrapper(*args, **kwargs):
             result = f(*args, **kwargs)
-            queue.put_nowait(result)
+            asyncio.run_coroutine_threadsafe(queue.put(result), loop)
+            # queue.put_nowait(result)
             log.debug("WRAPPER called, result: %s", result)
             return result
         return wrapper
@@ -439,10 +702,15 @@ class AmqpProducerDecorator(AsyncEndpoint, entrypoint.Transmitter):
         return AmqpDriver(amqp_alias)
 
     @classmethod
-    def wrap_taskflow_item(cls, driver, entrypoint_item, loop):
+    def wrap_taskflow_item(cls, driver, entrypoint_item):
         # callback = entrypoint_item.handler
         queue_bus = entrypoint_item.handler.queue
         exchange_name = entrypoint_item.meta["exchange"]
-        exchange_settings = entrypoint_item.meta.get("exchange_settings", DEFAULT_EXCHANGE_SETTINGS)
-        return AsyncAmqpProducerLoop(driver, queue_bus, exchange=exchange_name, exchange_settings=exchange_settings)
+        exchange_settings = entrypoint_item.meta.get("exchange_settings")
+        exchange_settings = ff.weld(exchange_settings or {}, AmqpExchangeTemplate.default_exchange_settings())
+        return AsyncAmqpProducerLoop(
+            driver, 
+            queue_bus, 
+            exchange_name=exchange_name, 
+            exchange_settings=exchange_settings)
 

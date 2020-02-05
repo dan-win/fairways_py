@@ -24,6 +24,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
     def setUpClass(cls):
         from fairways.ci import helpers
         cls.helpers = helpers
+        from fairways.io.asyn import base
 
         from fairways.io.asyn import amqp
         from fairways.io.asyn.consumer import amqp as amqp_sub
@@ -45,6 +46,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
         cls.amqp_pub = amqp_pub
 
         cls.entrypoint = entrypoint
+        cls.base = base
 
         # cls.clean_test_db()
 
@@ -136,7 +138,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
         # self.assertEqual(len(result), 1)
         # self.assertEqual(result[0].body, b'MY MESSAGE')
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_amqp_consumer_decorator(self):
         """
         """
@@ -184,7 +186,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
         # self.assertEqual(len(result), 1)
         # self.assertEqual(result[0].body, b'MY MESSAGE')
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_amqp_producer_decorator(self):
         """
         """
@@ -235,13 +237,13 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
                     await asyncio.sleep(0.1)
 
             print("################# DECORATOR LOOP")
-            consumers_future = self.amqp.consumer.create_tasks_future(driver, args=["--amqp", db_alias])
-            producers_future = self.amqp.producer.create_tasks_future(driver, args=["--amqp", db_alias])
+            consumers_future = self.amqp.consumer.create_tasks_future(args=["--amqp", db_alias])
+            producers_future = self.amqp.producer.create_tasks_future(args=["--amqp", db_alias])
             tasks = asyncio.gather(*[producers_future, consumers_future, runner()])
             async def destructor():
                 print("Closing driver...")
                 await driver.close()
-            result = self.helpers.run_asyn(tasks, destructor)
+            result = self.base.run_asyn(tasks, destructor)
 
             # driver.on_message(run_it, queue="fairways")
 

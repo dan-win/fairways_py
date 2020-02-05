@@ -35,7 +35,7 @@ import os
 import sys
 import functools
 import uuid
-
+import traceback
 from abc import abstractmethod
 # ? ^ remove
 
@@ -197,27 +197,31 @@ class Failure(Exception):
 
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        self.exc_type = exc_type.__name__
+        self.exc_name = exc_type.__name__
         self.method = method
         self.topic = topic
         self.fname = fname 
         self.line = exc_tb.tb_lineno
+        self.ext_info = "\n".join(traceback.format_exception(exc_type, exc_obj,
+                                          exc_tb))
     
     def __repr__(self):
-        return "Chain failure: {ftype} at method \"{method}\" in module {mod_filename} (line {lineno}) | {exc_instance!r}; {data}; {details}".format(
-            ftype=self.exc_type,
+        return "Chain failure: {ftype} at method \"{method}\" in module {mod_filename} (line {lineno}) | {exc_instance!r}; {data}; {details}\n{ext_info}".format(
+            ftype=self.exc_name,
             method=self.method,
             mod_filename=self.fname,
             lineno=self.line,
             exc_instance=self.exception,
             data=self.data_before_failure,
-            details=self.details
+            details=self.details,
+            ext_info=self.ext_info
         )
     
     def __str__(self):
-        return "Failure: {}".format(self.exc_type)
+        return "Failure: {}".format(self.exc_name)
+        
 
-        # return f"Chain failure: {self.exc_type} at method \"{self.method}\" in module {self.fname} (line {self.line}) | {self.exception!r}; {self.data_before_failure}; {self.details}"
+        # return f"Chain failure: {self.exc_name} at method \"{self.method}\" in module {self.fname} (line {self.line}) | {self.exception!r}; {self.data_before_failure}; {self.details}"
 
 class Chain:
     """

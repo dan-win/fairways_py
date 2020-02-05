@@ -2,10 +2,19 @@ from fairways.io.generic import (DataDriver, UriConnMixin, FileConnMixin)
 
 import asyncio
 import concurrent
+import threading
+
+import random
+import signal
+import uuid
+
+from contextlib import suppress
+
 from abc import abstractmethod
 
 import logging
-log = logging.getLogger(__name__)
+log = logging.getLogger()
+log.setLevel(level=logging.DEBUG)
 
 class AsyncDataDriver(DataDriver):
     """Base for async drivers.
@@ -75,13 +84,6 @@ class AsyncDataDriver(DataDriver):
             if self.autoclose:
                 await self.close()
 
-
-import random
-import signal
-import uuid
-
-from contextlib import suppress
-
 class AsyncLoop:
     """Async loop for message processing.
     You can run multiple instances of such loop at the same time.
@@ -94,7 +96,11 @@ class AsyncLoop:
 
     SENTINEL = "None"
 
-    STOP_EVENT = asyncio.Event()
+    GLOBAL_STOP_EVENT = threading.Event()
+
+    @classmethod
+    def request_stop(cls):
+        cls.GLOBAL_STOP_EVENT.set()
 
     def _create_queue(self, loop):
         return asyncio.Queue(loop=loop)
@@ -107,7 +113,7 @@ class AsyncLoop:
         :yield: Incoming message
         :rtype: Any
         """
-        for x in range(1, 10):
+        for x in range(1, 50):
             # produce an item
             print(f'{str(self)} producing {x}')
             # simulate i/o operation using sleep
@@ -130,17 +136,22 @@ class AsyncLoop:
         """Waiting for STOP_EVENT
         """
         log.debug('Listening for STOP_EVENT ...')
-        await self.STOP_EVENT.wait()
-        log.debug('STOP EVENT detected!')
+        # await self.STOP_EVENT.wait()
+        while not self.GLOBAL_STOP_EVENT.is_set():
+            await asyncio.sleep(random.random())
+        
+        log.debug('STOP EVENT detected by %s', str(self))
 
-    async def _shutdown(self, sig):
+    async def _shutdown(self, sig, loop):
         log.debug('Caught %s', sig.name)
         # print(f'Shutting down {str(self)} ...')
         # stop_event.set()
         # await queue.put(self.SENTINEL)
-        self.STOP_EVENT.set()
+        # self.STOP_EVENT.set()
+        # loop.call_soon_threadsafe(self.request_stop)
+        self.GLOBAL_STOP_EVENT.set()
         log.debug('Stop event set!...')
-        await asyncio.sleep(1)
+        # await asyncio.sleep(1)
     
     async def process_input(self, queue: asyncio.Queue):
         """Publish incoming message into internal queue. 
@@ -153,86 +164,112 @@ class AsyncLoop:
 
         async for message in self.input_stream():
         # async for message in sel.select():
-            # print("Message is: ", message)
-            await queue.put(message)
-            await asyncio.sleep(random.random())
-            # if stop_event.is_set():
-            if message == self.SENTINEL:
-                log.debug('Stopping producer for %s', self)
-                # await queue.put(self.SENTINEL)
+            try:
+                # print("Message is: ", message)
+                await queue.put(message)
+                # await asyncio.sleep(random.random())
+                # if stop_event.is_set():
+                if message == self.SENTINEL:
+                    log.debug('Stopping producer (sentinel found) for %s', self)
+                    # await queue.put(self.SENTINEL)
+                    break
+                # if self.STOP_EVENT.is_set():
+                #     log.debug('Stopping producer (stop event) for %s', self)
+                #     # await queue.put(self.SENTINEL)
+                #     break
+            except asyncio.CancelledError:
+                log.warning("AsyncLoop.process_input: Cancelling")
                 break
-            if self.STOP_EVENT.is_set():
-                log.debug('Stopping producer for %s', self)
-                # await queue.put(self.SENTINEL)
-                break
+            except Exception as e:
+                log.error("AsyncLoop.process_input: %r", e)
+                raise
 
     async def process_output(self, queue:asyncio.Queue):
         """Consume message from internal queue. 
         Note that this method can act as a producer for external destination!
-        * Final method *
         
         :param queue: Internal queue which receives incoming messages
         :type queue: asyncio.Queue
         """
 
         while True:
-            # wait for an item from the producer
-            item = await queue.get()
-            if item == self.SENTINEL:
-                # the producer emits None to indicate that it is done
-                log.debug("Process output - SENTINEL found, exiting")
+            try:
+                # wait for an item from the producer
+                item = await queue.get()
+                if item == self.SENTINEL:
+                    # the producer emits None to indicate that it is done
+                    log.debug("Process output - SENTINEL found, exiting")
+                    queue.task_done()
+                    # self.STOP_EVENT.set()
+                    break
+                
+                log.debug("Output stream [entering]")
+                # process the item
+                await self.output_stream(item)
+
+                log.debug("Output stream [done]")
+
+                # Notify the queue that the item has been processed
                 queue.task_done()
-                # self.STOP_EVENT.set()
+                log.debug("Queue task [done]")
+            except asyncio.CancelledError:
+                log.warning("AsyncLoop.process_output: Cancelling")
                 break
-            
-            log.debug("Output stream [entering]")
-            # process the item
-            await self.output_stream(item)
+            except Exception as e:
+                log.error("AsyncLoop.process_output: %r", e)
+                raise
 
-            log.debug("Output stream [done]")
-
-            # Notify the queue that the item has been processed
-            queue.task_done()
-            log.debug("Queue task [done]")
-
-    async def run(self, loop):
+    async def run(self, loop=None):
         """ Create main loop as async task """
+        try:
+            log.info("Starting %s", self)
+            # queue = self._create_queue(loop)
+            queue = asyncio.Queue()
 
-        log.info("Starting %s", self)
-        queue = self._create_queue(loop)
+            loop = loop or asyncio.get_event_loop()
 
-        signals = self.STOP_ON_SIGNALS
-        for s in signals:
-            loop.add_signal_handler(
-                s, lambda: asyncio.ensure_future(self._shutdown(s), loop=loop))
+            signals = self.STOP_ON_SIGNALS
+            for s in signals:
+                loop.add_signal_handler(
+                    s, lambda: asyncio.ensure_future(self._shutdown(s, loop),))
 
-        # schedule the consumer
-        consumer = asyncio.ensure_future(self.process_output(queue), loop=loop)
+            # schedule the consumer
+            consumer = asyncio.ensure_future(self.process_output(queue))
 
-        # schedule producer along with stop listener
-        tasks = [
-            self.process_interruption(), 
-            self.process_input(queue)
-        ]
+            producer = asyncio.ensure_future(self.process_input(queue))
 
-        finished, unfinished = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, loop=loop)
-        # await self.process_input(queue)
+            await self.process_interruption()     
+            
+            log.debug("Interruption: %s", self)       # schedule producer along with stop listener
+            # tasks = [
+            #     asyncio.ensure_future(self.process_interruption()), 
+            #     producer,
+            # ]
 
-        for task in unfinished:
-            await close_task(task)
+            # finished, unfinished = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            # await self.process_input(queue)
 
-        # await asyncio.wait(unfinished)
+            # for task in unfinished:
+            #     await close_task(task)
+            await close_task(producer)
 
-        # wait until the consumer has processed all items
-        await queue.join()
+            # await asyncio.wait(unfinished)
 
-        # the consumer is still awaiting for an item, cancel it
-        close_task(consumer)
+            # wait until the consumer has processed all items
+            await queue.join()
+
+            # the consumer is still awaiting for an item, cancel it
+            await close_task(consumer)
+        except Exception as e:
+            log.error("Main loop error: %r", e)
+            raise
 
     def __init__(self):
         """Constructor method
         """
         self.id = uuid.uuid4()
+        self.STOP_EVENT = asyncio.Event()
+
     
     def __str__(self):
         return f'Aio Loop {self.id.hex}'
@@ -241,8 +278,10 @@ class AsyncLoop:
 async def close_task(task):
     task.cancel()
     with suppress(asyncio.CancelledError, concurrent.futures.CancelledError):
-        log.debug('Closing unfinished task: %s', task)
+        log.debug('close_task: Closing unfinished task: %s', task)
         await task
+        # await asyncio.sleep(0.1)
+        log.debug('close_task: Unfinished task closed [Ok]: %s', task)
     log.debug("Task closed: %s", task)
 
 
@@ -270,7 +309,7 @@ class AsyncEndpoint:
         raise NotImplementedError()
 
     @classmethod
-    def create_tasks_future(cls, args=None):
+    def create_tasks_future(cls, *, args=None):
         """Wrap all endpoint processes into a asyncio.Future.
         This is recommended way to run multiple types of endpoints at the same time 
         (gather futures and pass them into run_asyn) 
@@ -287,14 +326,14 @@ class AsyncEndpoint:
 
         driver = cls.driver_factory(args)
         
-        loop = asyncio.get_event_loop()
+        # loop = asyncio.get_event_loop()
 
         # Note that "gather" wraps results into list:
         tasks_future = asyncio.gather(*[
             # run_consumer(driver, item)
-            cls.wrap_taskflow_item(driver, item, loop).run(loop)
+            cls.wrap_taskflow_item(driver, item).run()
             for item in items_to_run
-        ], loop=loop)
+        ])
 
         return tasks_future
 
@@ -324,23 +363,23 @@ def run_asyn(awaitable_obj, destructor=None):
     import inspect
     import signal
 
-    async def close_task(task):
-        task.cancel()
-        with suppress(asyncio.CancelledError, concurrent.futures.CancelledError):
-            log.info('Closing unfinished task: %s', task)
-            await task
-        log.debug("Task closed: %s", task)
+    # async def close_task(task):
+    #     task.cancel()
+    #     with suppress(asyncio.CancelledError, concurrent.futures.CancelledError):
+    #         log.info('Closing unfinished task: %s', task)
+    #         await task
+    #     log.debug("Task closed: %s", task)
 
     async def shutdown(sig):
         for task in asyncio.Task.all_tasks():
-            close_task(task)
+            await close_task(task)
         log.debug("Shutdown complete.")
 
     loop = asyncio.get_event_loop()
 
-    for s in (signal.SIGHUP, signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(
-            s, lambda: asyncio.ensure_future(self._shutdown(s), loop=loop))
+    # for s in (signal.SIGHUP, signal.SIGTERM, signal.SIGINT):
+    #     loop.add_signal_handler(
+    #         s, lambda: asyncio.ensure_future(self._shutdown(s), loop=loop))
 
     try:
         log.debug("Jumping into loop")
@@ -355,11 +394,11 @@ def run_asyn(awaitable_obj, destructor=None):
         loop.run_until_complete(task)
         # Main loop done (Ctrl+C, ...), exiting
         log.debug("Exiting...")
-        # Wait for pending tasks:
-        pending = asyncio.Task.all_tasks()
-        log.debug("Pending: %s", len(pending))
-        pending_future = asyncio.gather(*pending, loop=loop)
-        loop.run_until_complete(pending_future)
+        # # Wait for pending tasks:
+        # pending = asyncio.Task.all_tasks()
+        # log.debug("Pending: %s", len(pending))
+        # pending_future = asyncio.gather(*pending, loop=loop)
+        # loop.run_until_complete(pending_future)
         log.info("Done")
 
     # except KeyboardInterrupt:  # pragma: no branch

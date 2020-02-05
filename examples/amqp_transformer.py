@@ -6,6 +6,12 @@ import sys
 if "./.." not in sys.path:
     sys.path.append("./..")
 
+from fairways import conf
+from fairways import log
+import logging
+log = logging.getLogger()
+log.setLevel(level=logging.DEBUG)
+
 from fairways.io.asyn import amqp
 from fairways.taskflow import Chain 
 from fairways.funcflow import FuncFlow as ff
@@ -35,8 +41,9 @@ def check_pub_result(result):
     return result
 
 def handle_error(err_info):
-    failure = err_info
-    print("ERROR: Something totally wrong!", str(failure)[:1000])
+    # failure = err_info
+    extype, failure = err_info.popitem()
+    print("ERROR: Something wrong!", repr(failure))
 
 
 chain = Chain("AMQP transformer"
@@ -57,8 +64,16 @@ def run(message):
     return chain(message)
 
 if __name__ == '__main__':
-    run_asyn([
+    # run_asyn([
+    #     amqp.consumer.create_tasks_future(), 
+    #     amqp.producer.create_tasks_future()
+    # ])
+
+    import asyncio
+
+    loop = asyncio.get_event_loop()
+    tasks = asyncio.gather(*[
         amqp.consumer.create_tasks_future(), 
         amqp.producer.create_tasks_future()
-    ])
-
+    ], loop=loop)
+    loop.run_until_complete(tasks)

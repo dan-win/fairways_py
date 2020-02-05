@@ -5,6 +5,8 @@ from .serde import (serialize_json, deserialize_json)
 import pickle
 import urllib.parse
 
+from fairways.funcflow import FuncFlow as ff
+
 
 class HttpQueryTemplate:
     """ Template for HTTP request.
@@ -230,6 +232,19 @@ class RedisPopQuery(BaseQuery, ReaderMixin):
     #: Template for Redis request is a string
     template_class = str
 
+DEFAULT_EXCHANGE_SETTINGS = dict(
+    durable = True, 
+    auto_delete = False,
+    internal = False, 
+    passive = True,    
+)
+
+DEFAULT_QUEUE_SETTINGS = dict(
+    durable = True, 
+    auto_delete = False,
+    exclusive = False,
+    passive = True,    
+)
 
 class AmqpExchangeTemplate:
     """RabbitMQ/AMQP exchange template for publisher (producer).
@@ -239,34 +254,70 @@ class AmqpExchangeTemplate:
 
     :param exchange_name: Name of RabbitMQ exchange
     :type exchange_name: str
-    :param durable: Durable exchange, defaults to True
-    :type durable: bool, optional
-    :param auto_delete: Automatically delete exchange, defaults to False
-    :type auto_delete: bool, optional
-    :param internal: Internal, defaults to False
-    :type internal: bool, optional
-    :param passive: Passive, defaults to True
-    :type passive: bool, optional
     :param content_type: Content type of messages, defaults to 'text/plain'
     :type content_type: str, optional
+    :param routing_key: Routing key for all messages, default to None
+    :type routing_key: str, optional
+    :param exchange_settings: Exchange settings to pass as keywords arguments to aio-pika declare_exchange, defaults to `AmqpExchangeTemplate.default.exchange_settings()`
+    :type exchange_settings: dict, optional
     """
 
-    def __init__(self, exchange_name,
-        durable = True, 
-        auto_delete = False,
-        internal = False, 
-        passive = True,    
-        content_type = 'text/plain'
-        ):
+    encoders = {
+        'text/plain': str,
+        'application/json': serialize_json,
+        'application/octet-stream': pickle.dumps,
+    }
+
+    def __init__(self, exchange_name, *,
+            content_type=None,
+            routing_key=None,
+            exchange_settings=None,
+            ):
         """Constructor method
         """
         self.exchange_name = exchange_name 
-        self.durable = durable
-        self.auto_delete = auto_delete
-        self.internal = internal
-        self.passive = passive
-        self.content_type = content_type
+        self.exchange_settings = ff.weld(exchange_settings or {}, self.default_exchange_settings())
+        self.content_type = content_type or 'text/plain'
+        self.routing_key = routing_key or ""
+    
+    def render(self, *, 
+            message,
+            routing_key=None,
+            content_type=None,
+            headers=None,
+            exchange_settings=None):
 
+        routing_key = routing_key or self.routing_key
+        content_type = content_type or self.content_type
+        headers = headers or {}
+
+        try:
+            encoder = self.encoders[content_type]
+        except:
+            raise Exception(f"Unknown content-type: {content_type}")
+        encoded_data = encoder(message)
+        return dict(
+            body=encoded_data,
+            exchange=self.exchange_name, 
+            routing_key=routing_key,
+            headers=headers,
+            content_type=content_type, 
+            exchange_settings=self.exchange_settings)
+
+    @staticmethod
+    def default_exchange_settings():
+        """Exchange settings to pass into aio-pika declare_exchange method
+        
+        :return: Default settings for exchange
+        :rtype: dict
+        """
+        return dict(
+            durable = True, # Durability (exchange survive broker restart)
+            auto_delete = False, # Delete queue when channel will be closed
+            internal = False, # Do not send it to broker just create an object
+            passive = True, # Only check to see if the queue exists.
+            timeout = None, # Execution timeout
+        )
 
 class AmqpQueueTemplate:
     """RabbitMQ/AMQP exchange template for subscriber (consumer).
@@ -276,34 +327,53 @@ class AmqpQueueTemplate:
 
     :param queue_name: RabbitMQ queue name
     :type queue_name: str
-    :param durable: Durable, defaults to True
-    :type durable: bool, optional
-    :param auto_delete: Auto delete, defaults to False
-    :type auto_delete: bool, optional
-    :param exclusive: Exclusive, defaults to False
-    :type exclusive: bool, optional
-    :param passive: Passive, defaults to True
-    :type passive: bool, optional
     :param content_type: Content type of messages, defaults to 'text/plain'
     :type content_type: str, optional
+    :param queue_settings: Queue settings to pass as keywords arguments to aio-pika declare_queue, defaults to `AmqpQueueTemplate.default.queue_settings()`
+    :type queue_settings: dict, optional
     """
 
-    def __init__(self, queue_name,
-        durable = True, 
-        auto_delete = False,
-        exclusive = False,
-        passive = True,    
-        content_type = 'text/plain'
+    decoders = {
+        'text/plain': str,
+        'application/json': deserialize_json,
+        'application/octet-stream': pickle.loads,
+    }
+
+    def __init__(self, queue_name, *,
+        content_type = None,
+        queue_settings = None,
         ):
         """Constructor method        
         """
         self.queue_name = queue_name
-        self.durable = durable
-        self.auto_delete = auto_delete
-        self.exclusive = exclusive
-        self.passive = passive
-        self.content_type = content_type
+        self.queue_settings = ff.weld(queue_settings or {}, self.default_queue_settings())
+        self.content_type = content_type or 'text/plain'
 
+    def render(self, *, queue_name):
+        return 
+            # queue_name = params["queue"]
+            # queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
+
+        return dict(
+            queue_name=queue_name,
+            queue_settings=self.queue_settings,
+            content_type=self.content_type
+        )
+
+    @staticmethod
+    def default_queue_settings():
+        """Queue settings to pass into aio-pika declare_exchange method
+        
+        :return: Default settings for queue
+        :rtype: dict
+        """
+        return dict(
+            durable = True, # Durability (exchange survive broker restart)
+            auto_delete = False, # Delete queue when channel will be closed
+            exclusive = False, # Exclusive queues may only be accessed by the current connection, and are deleted when that connection closes
+            passive = True, # Only check to see if the queue exists.
+            timeout = 5, # Execution timeout
+        )
 
 class AmqpPublishQuery(BaseQuery, WriterMixin):
     """AMQP publish request. Write operation.
@@ -330,22 +400,8 @@ class AmqpPublishQuery(BaseQuery, WriterMixin):
     #: Template class for AMQP exchange
     template_class = AmqpExchangeTemplate
 
-    encoders = {
-        'text/plain': str,
-        'application/json': serialize_json,
-        'application/octet-stream': pickle.dumps,
-    }
-
     def _transform_params(self, params): # -> dict
-        message = params["message"]
-        routing_key = params.get("routing_key", "")
-        content_type = self.template.content_type
-        try:
-            encoder = self.encoders[content_type]
-        except:
-            raise Exception(f"Unknown content-type: {content_type}")
-        encoded_data = encoder(message)
-        return dict(message=encoded_data, routing_key=routing_key, options=self.template)
+        return self.template.render(**params)
 
 class AmqpConsumeQuery(BaseQuery, ReaderMixin):
     """AMQP consume request. Read operation. 
@@ -355,7 +411,7 @@ class AmqpConsumeQuery(BaseQuery, ReaderMixin):
     :param connection_alias: Name of environment/config variable which holds connection string (e.g.: `amqp://user:password@localhost:5672/%2f`).
     :type connection_alias: str
     :param driver: Driver class. Use appropriate driver for your application (either syn.amqp.AmqpDriver or asyn.amqp.AmqpDriver).
-    :type driver: syn.amqp.AmqpDriver | asyn.amqp.AmqpDriver
+    :type driver: syn.amqp.AmqpDriver or asyn.amqp.AmqpDriver
     :param meta: Any user-defined data to store with this query, defaults to None
     :type meta: Mapping, optional
 
@@ -365,16 +421,11 @@ class AmqpConsumeQuery(BaseQuery, ReaderMixin):
     >>> options = AmqpQueueTemplate(
     ...    queue_name="fairways")
     >>> consumer = AmqpConsumeQuery(
-    ...    options, conn_alias, AmqpDriver, {})
+    ...    options, conn_alias, AmqpDriver)
     >>> result = consumer.get_records()
     """
     template_class = AmqpQueueTemplate
 
-    decoders = {
-        'text/plain': str,
-        'application/json': deserialize_json,
-        'application/octet-stream': pickle.loads,
-    }
-
     def _transform_params(self, params): # -> dict
-        return dict(options=self.template)
+        # return dict(options=self.template)
+        return self.template.render(**params)

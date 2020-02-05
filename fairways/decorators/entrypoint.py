@@ -89,7 +89,7 @@ class Cmd(Channel):
         
         args = args or sys.argv[1:]
         parser = argparse.ArgumentParser()
-        parser.add_argument('-c',  '--command', required=True, help='Select entrypoint by command param')
+        parser.add_argument('-c',  '--command', help='Select entrypoint by command param')
         # parser.add_argument('-f',  '--file', help='File with initial data')
         args = parser.parse_args(args)
         command = args.command
@@ -97,7 +97,9 @@ class Cmd(Channel):
 
         item_to_run = cls.chain().find(lambda item: item.meta.get("param") == command).value
         if not item_to_run:
-            raise ValueError(f"Cannot find entrypoint by param: {command}")
+            log.debug("Cmd decorator: no entrypoints for -c param %s", command)
+            return
+            # raise ValueError(f"Cannot find entrypoint by param: {command}")
         return item_to_run.handler({})
 
 
