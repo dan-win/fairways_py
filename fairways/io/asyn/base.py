@@ -94,8 +94,6 @@ class AsyncLoop:
 
     STOP_ON_SIGNALS = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
 
-    SENTINEL = "None"
-
     GLOBAL_STOP_EVENT = threading.Event()
 
     @classmethod
@@ -119,7 +117,6 @@ class AsyncLoop:
             # simulate i/o operation using sleep
             yield str(x)
             await asyncio.sleep(random.random())
-        yield self.SENTINEL
         await asyncio.sleep(random.random())
         self.GLOBAL_STOP_EVENT.set()
 
@@ -169,15 +166,6 @@ class AsyncLoop:
                 # print("Message is: ", message)
                 await queue.put(message)
                 # await asyncio.sleep(random.random())
-                # if stop_event.is_set():
-                if message == self.SENTINEL:
-                    log.debug('Stopping producer (sentinel found) for %s', self)
-                    # await queue.put(self.SENTINEL)
-                    break
-                # if self.STOP_EVENT.is_set():
-                #     log.debug('Stopping producer (stop event) for %s', self)
-                #     # await queue.put(self.SENTINEL)
-                #     break
             except asyncio.CancelledError:
                 log.warning("AsyncLoop.process_input: Cancelling")
                 break
@@ -197,12 +185,6 @@ class AsyncLoop:
             try:
                 # wait for an item from the producer
                 item = await queue.get()
-                if item == self.SENTINEL:
-                    # the producer emits None to indicate that it is done
-                    log.debug("Process output - SENTINEL found, exiting")
-                    queue.task_done()
-                    # self.STOP_EVENT.set()
-                    break
                 
                 log.debug("Output stream [entering]")
                 # process the item

@@ -456,10 +456,6 @@ class AmqpDriver(AsyncDataDriver, UriConnMixin):
                 while True:
                     log.debug("Waiting for message")
                     message = await aio_queue.get()
-                    if message == AsyncAmqpProducerLoop.SENTINEL:
-                        log.debug("Sentinel occurs in driver output stream")
-                        keep_running = False
-                        break
                     log.debug("Message occurs: %s", message)
                     if not isinstance(message, dict):
                         log.error("Message should be a dict, but type is %s", type(message))
@@ -521,7 +517,6 @@ class AsyncAmqpConsumerLoop(AsyncLoop):
             try:
                 yield message
             except asyncio.CancelledError:
-                yield self.SENTINEL
                 break
 
     async def output_stream(self, message):
@@ -551,8 +546,6 @@ class AsyncAmqpProducerLoop(AsyncLoop):
                 item = await self.queue_bus.get()
                 log.debug("Message in input_stream...")
                 self.queue_bus.task_done()
-                if item == self.SENTINEL:
-                    break
                 # TODO: message implicit typecast - restore
                 if isinstance(item, (str, bytes)):
                     item = dict(body=item)
