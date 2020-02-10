@@ -159,18 +159,20 @@ class DataDriver:
         """
         pass
     
-    def __init__(self, env_varname):
+    def __init__(self, env_varname, **kwargs):
         """Constructor
         """
         # "this" points to this module here, see above
-        conn_uri_raw = this._config_provider.get(env_varname, self.default_conn_str)
+        conn_uri_raw = kwargs.get("conn_str")
+        if conn_uri_raw is None:
+            conn_uri_raw = this._config_provider.get(env_varname, self.default_conn_str)
         conn_uri = replace_env_vars(conn_uri_raw)
         self.conn_str = conn_uri
         # Used from mixin:
         self.uri_parts = self._parse_uri(conn_uri)
         log.debug(f"Loading {self}...")
         self.engine = None
-
+    
     def __str__(self):
         return f"Driver {self.__class__.__name__} | {self.conn_str}"
 

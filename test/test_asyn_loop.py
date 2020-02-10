@@ -53,11 +53,19 @@ class AsyncLoopTestCase(unittest.TestCase):
         #     # result = test(ctx)
         # result = self.helpers.run_asyn(AsyncLoop.run())
         loop = asyncio.get_event_loop()
-        tasks = asyncio.gather(*[
-            AsyncLoop().run(loop),
-            AsyncLoop().run(loop)
-        ], loop=loop)
-        loop.run_until_complete(tasks)
+        async def together():
+            # Wrapping here because we cannot call async "wait" from sync code directly:
+            # tasks = asyncio.gather(*[
+            #     AsyncLoop().run(loop),
+            #     AsyncLoop().run(loop)
+            # ], loop=loop)
+            tasks = [
+                AsyncLoop().run(loop),
+                AsyncLoop().run(loop)
+            ]
+            finished, unfinished = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        loop.run_until_complete(together())
         # loop.close()
         # self.assertEqual(result, [{'name': 'My Way'}])
 

@@ -113,7 +113,7 @@ class AsyncLoop:
         :yield: Incoming message
         :rtype: Any
         """
-        for x in range(1, 50):
+        for x in range(1, 20):
             # produce an item
             print(f'{str(self)} producing {x}')
             # simulate i/o operation using sleep
@@ -121,6 +121,7 @@ class AsyncLoop:
             await asyncio.sleep(random.random())
         yield self.SENTINEL
         await asyncio.sleep(random.random())
+        self.GLOBAL_STOP_EVENT.set()
 
     @abstractmethod
     async def output_stream(self, message):
@@ -238,15 +239,16 @@ class AsyncLoop:
 
             producer = asyncio.ensure_future(self.process_input(queue))
 
-            await self.process_interruption()     
+            # await self.process_interruption()     
             
             log.debug("Interruption: %s", self)       # schedule producer along with stop listener
-            # tasks = [
-            #     asyncio.ensure_future(self.process_interruption()), 
-            #     producer,
-            # ]
 
-            # finished, unfinished = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            tasks = [
+                asyncio.ensure_future(self.process_interruption()), 
+                producer,
+            ]
+
+            finished, unfinished = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             # await self.process_input(queue)
 
             # for task in unfinished:

@@ -194,6 +194,7 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
 
         AmqpConsumer = self.amqp_sub.AmqpConsumer
         AmqpDriver = self.amqp.AmqpDriver
+        AsyncAmqpConsumerLoop = self.amqp.AsyncAmqpConsumerLoop
 
         AmqpPublisher = self.amqp_pub.AmqpPublisher
 
@@ -235,6 +236,8 @@ class AsynAmqpPublishConsumeTestCase(unittest.TestCase):
                 for i in range(1,5):
                     publish()
                     await asyncio.sleep(0.1)
+                AsyncAmqpConsumerLoop.GLOBAL_STOP_EVENT.set()
+                
 
             print("################# DECORATOR LOOP")
             consumers_future = self.amqp.consumer.create_tasks_future(args=["--amqp", db_alias])
