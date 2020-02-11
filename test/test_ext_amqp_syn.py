@@ -110,7 +110,9 @@ class SynAmqpPublishConsumeTestCase(unittest.TestCase):
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].body, b'{"mydata": "MY MESSAGE"}')
+        self.assertEqual(result[0].header['content_type'], "application/json")
 
+    @unittest.skip("This feature considered as tentative. Looking to move away from syncronous AMQP consumer in the future")
     def test_amqp_decorator(self):
         """
         """
@@ -134,8 +136,10 @@ class SynAmqpPublishConsumeTestCase(unittest.TestCase):
             driver = AmqpDriver(db_alias)
             for i in range(1,5):
                 driver.execute(None, message=test_message, routing_key="", options=AmqpExchangeTemplate(exchange_name='fairways-1'))
+            driver.execute(None, message="LAST", routing_key="", options=AmqpExchangeTemplate(exchange_name='fairways-1'))
             for i in range(1,5):
                 driver.execute(None, message=test_message, routing_key="", options=AmqpExchangeTemplate(exchange_name='fairways-2'))
+            driver.execute(None, message="LAST", routing_key="", options=AmqpExchangeTemplate(exchange_name='fairways-2'))
 
             # driver.close()
 
@@ -150,10 +154,14 @@ class SynAmqpPublishConsumeTestCase(unittest.TestCase):
             @self.amqp.entrypoint(queue="fairways-1")
             def run_it(message):
                 print("LOOP 1 ==========================================>\n", message)
+                if message == "LAST":
+                    return False
 
             @self.amqp.entrypoint(queue="fairways-2")
             def run_it(message):
                 print("LOOP 2 ==========================================>\n", message)
+                if message == "LAST":
+                    return False
 
             print("################# DECORATOR LOOP")
             self.amqp.entrypoint.run(args=["--amqp", db_alias])

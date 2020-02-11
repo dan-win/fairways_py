@@ -296,13 +296,16 @@ class AmqpExchangeTemplate:
         except:
             raise Exception(f"Unknown content-type: {content_type}")
         encoded_data = encoder(message)
+
         return dict(
-            body=encoded_data,
-            exchange=self.exchange_name, 
+            message=encoded_data,
             routing_key=routing_key,
-            headers=headers,
-            content_type=content_type, 
-            exchange_settings=self.exchange_settings)
+            options=dict(
+                exchange_name=self.exchange_name, 
+                headers=headers,
+                content_type=content_type, 
+                exchange_settings=self.exchange_settings
+            ))
 
     @staticmethod
     def default_exchange_settings():
@@ -349,13 +352,9 @@ class AmqpQueueTemplate:
         self.queue_settings = ff.weld(queue_settings or {}, self.default_queue_settings())
         self.content_type = content_type or 'text/plain'
 
-    def render(self, *, queue_name):
-        return 
-            # queue_name = params["queue"]
-            # queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
-
+    def render(self, **kwargs):
         return dict(
-            queue_name=queue_name,
+            queue_name=self.queue_name,
             queue_settings=self.queue_settings,
             content_type=self.content_type
         )

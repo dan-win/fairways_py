@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Example: AMQP transformer (consume->transform->publish)
+"""Example: AMQP transformer (consume->transform->publish).
+Define connection string before invokation ant use then:
+MY_AMQP_1=amqp://fairways:fairways@localhost:5672/%2f python amqp_transformer.py --amqp MY_AMQP_1
 """
 import sys
 

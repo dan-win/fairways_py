@@ -609,10 +609,10 @@ class AmqpConsumerDecorator(AsyncEndpoint, entrypoint.Listener):
         import sys, argparse
         args = args or sys.argv[1:]
         parser = argparse.ArgumentParser()
-        parser.add_argument('--amqp', required=True, help='Select AMQP mode')
+        parser.add_argument('--amqp', required=True, help='AMQP alias (name of environment variable which holds connection string)')
         args = parser.parse_args(args)
-        amqp_alias = args.amqp
-        return AmqpDriver(amqp_alias)
+        conn_alias = args.amqp
+        return AmqpDriver(conn_alias)
 
     @classmethod
     def wrap_taskflow_item(cls, driver, entrypoint_item):
@@ -689,10 +689,10 @@ class AmqpProducerDecorator(AsyncEndpoint, entrypoint.Transmitter):
         import sys, argparse
         args = args or sys.argv[1:]
         parser = argparse.ArgumentParser()
-        parser.add_argument('--amqp', required=True, help='Select AMQP mode')
+        parser.add_argument('--amqp', required=True, help='AMQP alias (name of environment variable which holds connection string)')
         args = parser.parse_args(args)
-        amqp_alias = args.amqp
-        return AmqpDriver(amqp_alias)
+        conn_alias = args.amqp
+        return AmqpDriver(conn_alias)
 
     @classmethod
     def wrap_taskflow_item(cls, driver, entrypoint_item):

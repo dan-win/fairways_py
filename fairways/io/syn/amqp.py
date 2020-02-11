@@ -74,12 +74,12 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
         :raises Exception: Re-raise exceptions of underlying engine
         """
         # TODO: 
-        message = params["message"]        
-        routing_key = params["routing_key"]
-        options = params["options"]
+        # message = params["message"]        
+        # routing_key = params["routing_key"]
+        # options = params["options"]
         # exchange_settings = params.get("exchange_settings", DEFAULT_EXCHANGE_SETTINGS)
-        exchange_name = options.exchange_name
-        content_type = options.content_type
+        exchange_name = options["exchange_name"]
+        content_type = options["content_type"]
 
         try:
             self._ensure_connection()
@@ -103,7 +103,10 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
                 self.close()
 
 
-    def get_records(self, _, **params) -> List[Message]:
+    def get_records(self, _, *, 
+            queue_name,
+            queue_settings=None,
+            content_type=None) -> List[Message]:
         """Fetch single message
         
         :param _: Ignored (only for consistency with BaseDriver signature)
@@ -112,21 +115,28 @@ class AmqpDriver(SynDataDriver, UriConnMixin):
         :rtype: List[Message] 
         """
 
-        options = params["options"]
         # queue_settings = params.get("queue_settings", DEFAULT_QUEUE_SETTINGS)
         try:
             self._ensure_connection()
             connection = self.engine
             channel = connection.channel()    # type: aio_pika.Channel            
 
-            # queue = await channel.declare_queue(queue_name, **queue_settings)
-
-            method_frame, header_frame, body = channel.basic_get(options.queue_name)
+            #Note that header_frame is pika.BasicProperties instance, not a dict!
+            method_frame, header_frame, body = channel.basic_get(queue_name)
             if method_frame:
                 channel.basic_ack(method_frame.delivery_tag)
-                # log.warning("Getting JSON??? ******************* %s| %s| %s", method_frame, header_frame, body)
-                # log.warning("Getting JSON??? ******************* %s| %s| %s",header_frame.content_type,header_frame.content_encoding,header_frame.headers)
-                return [Message(body=body, header=header_frame, method=method_frame)]
+
+                return [
+                    Message(
+                        body=body, 
+                        header=dict(
+                            content_type=header_frame.content_type,
+                            content_encoding=header_frame.content_encoding,
+                            headers=header_frame.headers
+                        ), 
+                        method=method_frame
+                    )
+                ]
             else:
                 log.debug('No message returned')
                 return []

@@ -41,6 +41,9 @@ import itertools
 from abc import abstractmethod
 import atexit
 
+import multiprocessing
+DEFAULT_MAX_CONN = multiprocessing.cpu_count()
+
 CONF_KEY = "CONNECTIONS"
 
 # RE_ENV_EXPRESSION = re.compile(r"\{\$(.*?)\}")
@@ -265,7 +268,7 @@ class ConnectionPool:
         :return: Instance of data driver
         :rtype: DataDriver
         """
-        max_conn = getattr(driver_cls, "MAX_CONN", 3)
+        max_conn = getattr(driver_cls, "MAX_CONN", DEFAULT_MAX_CONN)
         pool_for_driver_cls = cls._pool.get(env_varname, None)
 
         if pool_for_driver_cls:
@@ -421,6 +424,7 @@ class WriterMixin:
         connection = ConnectionPool.select(self.driver, self.connection_alias)
         try:
             # log.debug(f"TRACE QUERY: {self.driver} | {self.connection_alias} | {self.template} ")
+            print ("PARAMS: ", params)
             return connection.execute(self.template, **params)
         except Exception as e:
             log.error("Error with DB write: {!r}; SQL: {}".format(e, self.template))
