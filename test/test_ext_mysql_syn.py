@@ -17,6 +17,9 @@ def setUpModule():
 def tearDownModule():
     pass
 
+from test.test_env import SKIP_EXT_DB_SERVERS
+@unittest.skipIf(SKIP_EXT_DB_SERVERS, 
+    "Skip when test servers are not available in environment")
 class MySqlTestCase(unittest.TestCase):
     db_conn_str = "mysql://fairways:fairways@localhost:3306/"
 
