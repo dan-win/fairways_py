@@ -1,33 +1,34 @@
 import os, sys
+from fairways import log
 import logging
-logging.basicConfig( stream=sys.stderr )
+# logging.basicConfig( stream=sys.stderr )
 
-try:
-    from colorlog import ColoredFormatter
-    formatter = ColoredFormatter(
-        "%(log_color)s%(levelname)-8s %(message)s%(reset)s",
-        datefmt=None,
-        reset=True,
-        log_colors={
-            'DEBUG':    'cyan',
-            'INFO':     'green',
-            'WARNING':  'yellow',
-            'ERROR':    'red',
-            'CRITICAL': 'red',
-        }
-    )
-except:
-    formatter = None
-    print("You could install colorlog")
+# try:
+#     from colorlog import ColoredFormatter
+#     formatter = ColoredFormatter(
+#         "%(log_color)s%(levelname)-8s %(message)s%(reset)s",
+#         datefmt=None,
+#         reset=True,
+#         log_colors={
+#             'DEBUG':    'cyan',
+#             'INFO':     'green',
+#             'WARNING':  'yellow',
+#             'ERROR':    'red',
+#             'CRITICAL': 'red',
+#         }
+#     )
+# except:
+#     formatter = None
+#     print("You could install colorlog")
 
-def getLogger():        
-    handler = logging.StreamHandler()
-    if formatter:
-        handler.setFormatter(formatter)
-    root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
-    root.addHandler(handler)
-    return root
+def getLogger(name=None):
+    # # handler = logging.StreamHandler()
+    # # if formatter:
+    # #     handler.setFormatter(formatter)
+    root_log = log.getLogger(name)
+    root_log.setLevel(logging.DEBUG)
+    # # root_log.addHandler(handler)
+    return root_log
 
 def run_asyn(coro_obj):
     import asyncio

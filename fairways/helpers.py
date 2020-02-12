@@ -64,6 +64,10 @@ def rows2dict(r, key_attr=None, value_attr=None):
 
 def ColoredFormatterFactory(**kwargs):
     format_template = kwargs.pop("format_template")
-    from colorlog import ColoredFormatter
-    print("^^^^^^^^^^^^^^^^^^^^^^ ColoredFormatterFactory", ColoredFormatter)
-    return ColoredFormatter(format_template, **kwargs)
+    try:
+        from colorlog import ColoredFormatter
+        return ColoredFormatter(format_template, **kwargs)
+    except:
+        print("Color log is not installed, downgrading to standard formatter...")
+        import logging
+        return logging.Formatter(template)

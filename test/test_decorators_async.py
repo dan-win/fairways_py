@@ -59,6 +59,7 @@ class IoTaskTestCase(unittest.TestCase):
 
         self.assertListEqual(data, [1, 2, 3])
 
+    @unittest.skip("Refactor this example, its totally wrong (asyncio.Queue is not thread safe, there are no running loops in threads by default!)")
     def test_io_task_concurrent(self):
         """
         """

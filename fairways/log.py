@@ -15,6 +15,22 @@ def set_conf(logging_conf):
         logging_conf = DEFAULT_CONF
     logging.config.dictConfig(logging_conf)
 
+_loggers = {}
+
+def getLogger(name=None, level=logging.INFO):        
+    # handler = logging.StreamHandler()
+    # if formatter:
+    #     handler.setFormatter(formatter)
+    root_log = _loggers.get(name)
+    if root_log is None:
+        root_log = logging.getLogger(name)
+        root_log.setLevel(level)
+        _loggers[name] = root_log
+    # root_log.addHandler(handler)
+    root_log = _loggers.get(name)
+    if level != logging.INFO:
+        root_log.setLevel(level)
+    return root_log
 
 DEFAULT_CONF = {
     'version': 1,
@@ -25,26 +41,26 @@ DEFAULT_CONF = {
             'class': 'logging.StreamHandler',
             'formatter': 'color'            
         },
-        "rmq": {
-			'level': 'DEBUG',
-			'class': 'python_logging_rabbitmq.RabbitMQHandler',
-			'host': 'localhost',
-			'port': 5672,
-			'username': 'guest',
-			'password': 'guest',
-			'exchange': 'log',
-			'declare_exchange': False,
-			'connection_params': {
-				'virtual_host': '/',
-				'connection_attempts': 3,
-				'socket_timeout': 5000
-			},
-			'fields': {
-				'source': 'MainAPI',
-				'env': 'production'
-			},
-			'fields_under_root': True            
-        }
+        # "rmq": {
+		# 	'level': 'DEBUG',
+		# 	'class': 'python_logging_rabbitmq.RabbitMQHandler',
+		# 	'host': 'localhost',
+		# 	'port': 5672,
+		# 	'username': 'guest',
+		# 	'password': 'guest',
+		# 	'exchange': 'log',
+		# 	'declare_exchange': False,
+		# 	'connection_params': {
+		# 		'virtual_host': '/',
+		# 		'connection_attempts': 3,
+		# 		'socket_timeout': 5000
+		# 	},
+		# 	'fields': {
+		# 		'source': 'MainAPI',
+		# 		'env': 'production'
+		# 	},
+		# 	'fields_under_root': True            
+        # }
     },
 
     "formatters": {
@@ -70,12 +86,12 @@ DEFAULT_CONF = {
     "loggers": {
         "": {
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "INFO",
             "formatter": "color"
         },
-        "rmq": {
-            "handlers": ["rmq"]
-        }
+        # "rmq": {
+        #     "handlers": ["rmq"]
+        # }
     }
 }
 

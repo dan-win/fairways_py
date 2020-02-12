@@ -29,6 +29,12 @@ class FromTypeTestCase(unittest.TestCase):
             def __str__(self):
                 return f"{self.__class__.__name__}:{self.name}"
 
+        class CustomClass1:
+            def __init__(self, name):
+                self.name = name
+            def __str__(self):
+                return f"{self.__class__.__name__}:{self.name}"
+
         class MyClass(typecast.FromTypeMixin):
 
             def __init__(self, value=None):
@@ -50,6 +56,10 @@ class FromTypeTestCase(unittest.TestCase):
             def _from_obj(self, value):
                 self.value = f"From CustomClass: {value}"
             
+            @typecast.fromtype('CustomClass1')
+            def _from_obj(self, value):
+                self.value = f"From CustomClass1: {value}"
+
             def __str__(self):
                 return self.value
 
@@ -57,6 +67,7 @@ class FromTypeTestCase(unittest.TestCase):
         self.assertEqual('From str: Text', MyClass.fromtype("Text").value)
         self.assertEqual("From dict: {'a': 1}", MyClass.fromtype(dict(a=1)).value)
         self.assertEqual('From CustomClass: CustomClass:objectName', MyClass.fromtype(CustomClass("objectName")).value)
+        self.assertEqual('From CustomClass1: CustomClass1:objectName1', MyClass.fromtype(CustomClass1("objectName1")).value)
 
 class IntoTypeTestCase(unittest.TestCase):
     @classmethod
@@ -70,6 +81,12 @@ class IntoTypeTestCase(unittest.TestCase):
 
 
         class CustomClass:
+            def __init__(self, name):
+                self.name = name
+            def __str__(self):
+                return f"{self.__class__.__name__}:{self.name}"
+
+        class CustomClass1:
             def __init__(self, name):
                 self.name = name
             def __str__(self):
@@ -96,6 +113,10 @@ class IntoTypeTestCase(unittest.TestCase):
             def _into_obj(self, value):
                 return CustomClass(self.value)
             
+            @typecast.intotype('CustomClass1')
+            def _into_obj(self, value):
+                return CustomClass(self.value)
+
             def __str__(self):
                 return self.value
 
@@ -103,3 +124,4 @@ class IntoTypeTestCase(unittest.TestCase):
         self.assertEqual('1', MyClass("1").intotype(str))
         self.assertDictEqual({'value': '1'}, MyClass("1").intotype(dict))
         self.assertEqual('CustomClass:1', str(MyClass("1").intotype(CustomClass)))
+        self.assertEqual('CustomClass:1', str(MyClass("1").intotype(CustomClass1)))

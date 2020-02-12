@@ -44,12 +44,14 @@ from abc import abstractmethod
 
 from fairways.funcflow import FuncFlow as ff
 from fairways.helpers import (get_nested_default, get_parent, get_lastkey)
+from fairways.decorators import typecast
 
-import logging
-log = logging.getLogger()
+from fairways import log
+# import logging
+log = log.getLogger()
 
 
-class Envelope:
+class Envelope(typecast.FromTypeMixin):
     """Container to pass data between tasks
 
     :param initial_data: Data to pass. Usually this is Mapping, but you could use another type 
@@ -62,28 +64,33 @@ class Envelope:
 
     ROOT = None
     DATA_ROOT = "data" 
-    DATA_STACK = "stack" 
+    # DATA_STACK = "stack" 
     FAILURE_ROOT = "failure"
 
-    def __init__(self, initial_data):
+    def __init__(self, *, initial_data, failure_data=None):
         """Constructor method
         """        
         self.state = {
             self.DATA_ROOT: initial_data,
-            self.DATA_STACK: None,
-            self.FAILURE_ROOT: None # On failure this memder becomes dict where key is exception classname and value is exception details
+            # self.DATA_STACK: None,
+            self.FAILURE_ROOT: failure_data # On failure this memder becomes dict where key is exception classname and value is exception details
         }
+    
+    @typecast.fromtype('Envelope')
+    def _from_obj(self, value):
+        self.state = ff.weld(value.state)
 
-    @abstractmethod
     def clone(self):
         """Deep copy of wrapped data and state 
         
         :return: [description]
         :rtype: [type]
         """
-        return ff.deep_extend({}, self.state)
+        initial_data = ff.deep_extend({}, self.state[self.DATA_ROOT])
+        failure_data = ff.deep_extend({}, self.state[self.FAILURE_ROOT])
+        return Envelope(initial_data=initial_data, failure_data=failure_data)
     
-    def getval(self, attr_path):
+    def get_ctx(self, attr_path):
         """Get attribute value.
         Nested mappings are supported also.
         You can address values of nested objects using default separator "/"
@@ -98,9 +105,11 @@ class Envelope:
         :return: Value, related to the attribute name.
         :rtype: Any
         """
-        return get_nested_default(self.state, attr_path)
+        if attr_path:
+            return get_nested_default(self.state, attr_path)
+        return self.state
     
-    def setval(self, attr_path, value):
+    def set_ctx(self, attr_path, value):
         """Set attribute value. 
         Nested mappings are supported also.
         You can address values of nested objects using default separator "/".
@@ -114,19 +123,56 @@ class Envelope:
         :param value: New value
         :type value: Any
         """
-        node = get_parent(self.state, attr_path)
-        last_key = get_lastkey(attr_path)
-        log.debug("Envelope setval: %s; %s", attr_path, self.state)
-        node.update({last_key: value})
+        # Overwrite entire context, try to keep it immutable (???)
+        # data = self.state[self.DATA_ROOT]
+        # new_ctx_data = ff.copy(data)
+        # if self.isfailure:
+        #     new_ctx
+        if attr_path:
+            # Some child selected
+            node = get_parent(self.state, attr_path)
+            last_key = get_lastkey(attr_path)
+            log.debug("Envelope set_ctx: %s; %s", attr_path, self.state)
+            node.update({last_key: value})
+        else:
+            # Overwrite all
+            self.state = value
+
+    def _get_full_data_path(self, *, root=None, topic=None):
+        if root is None:
+            root = Envelope.DATA_ROOT
+        if topic:
+            return "/".join([root, topic])
+        return root
 
     # Shortcut, helper:
-    def get_data(self):
-        """Get entire data object for last successfull task
+    def get_data(self, topic=None):
+        """Get entire data object for last successful task
         
         :return: Wrapped object
         :rtype: Any
         """
-        return self.getval(self.DATA_ROOT)
+        # # return self.get_ctx(self.DATA_ROOT)
+        # if topic:
+        #     topic = "/".join([self.DATA_ROOT, topic])
+        # else:
+        #     topic = self.DATA_ROOT
+        # return self.get_ctx(topic)
+        attr_path = self._get_full_data_path(topic=topic)
+        return get_nested_default(self.state, attr_path)
+
+    def set_data(self, topic=None, value=None):
+        """Get entire data object for last successful task
+        
+        :return: Wrapped object
+        :rtype: Any
+        """
+        attr_path = self._get_full_data_path(topic=topic)
+        # self.set_ctx(topic, value)
+        node = get_parent(self.state, attr_path)
+        last_key = get_lastkey(attr_path)
+        log.debug("Envelope set_data: %s; %s; %s; %s", attr_path, node, last_key, self.state)
+        node.update({last_key: value})
 
     def get_failure(self):
         """Get entire data object for last failed task
@@ -134,7 +180,7 @@ class Envelope:
         :return: Wrapped object
         :rtype: Any
         """
-        return self.getval(self.FAILURE_ROOT)
+        return self.get_ctx(self.FAILURE_ROOT)
 
     def set_failure(self, failure):
         """Set failure state
@@ -145,11 +191,12 @@ class Envelope:
         """
         if failure is None:
             raise ValueError("set_failure cannot accept None")
-        self.state[self.DATA_STACK], self.state[self.DATA_ROOT] = self.state[self.DATA_ROOT], None
+        # if self.state[self.DATA_STACK] is None:
+        #     self.state[self.DATA_STACK], self.state[self.DATA_ROOT] = self.state[self.DATA_ROOT], None
         self.state[self.FAILURE_ROOT] = failure
 
     def reset_failure(self):
-        self.state[self.DATA_ROOT], self.state[self.DATA_STACK] = self.state[self.DATA_STACK], None
+        # self.state[self.DATA_ROOT], self.state[self.DATA_STACK] = self.state[self.DATA_STACK], None
         self.state[self.FAILURE_ROOT] = None
 
     @property    
@@ -159,7 +206,15 @@ class Envelope:
         :return: Value
         :rtype: bool
         """
-        return self.state[self.FAILURE_ROOT] is not None
+        return bool(self.state[self.FAILURE_ROOT])
+    
+    @property
+    def active_root(self):
+        return self.FAILURE_ROOT if self.isfailure else self.DATA_ROOT
+    
+    def get(self, root, topic):
+        attr_path = self._get_full_data_path(root=root, topic=topic)
+        return get_nested_default(self.state, attr_path)
 
 
 class SkipFollowing(Exception):
@@ -176,8 +231,8 @@ class SkipFollowing(Exception):
         super().__init__(*args, **kwargs)
 
 
-class Failure(Exception):
-    """Generic exception for task flow.
+class Failure:
+    """Generic exception wrapper for task flow.
     It is a wrapper for standard exceptions with additional metadata.
 
     :param exception: Exception instance which happens during runtime 
@@ -188,37 +243,37 @@ class Failure(Exception):
     :type topic: str
 
     """
-    def __init__(self, exception, data_before_failure, method=None, topic=None, **kwargs):
+    def __init__(self, exception, data_before_failure, method_name=None, topic=None, **kwargs):
         """Constructor method
         """
-        self.exception = exception
         self.data_before_failure = data_before_failure
+        self.topic = topic
+        self.method_name = method_name
         self.details = kwargs
 
         exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        self.exc_type = exc_type
         self.exc_name = exc_type.__name__
-        self.method = method
-        self.topic = topic
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         self.fname = fname 
         self.line = exc_tb.tb_lineno
         self.ext_info = "\n".join(traceback.format_exception(exc_type, exc_obj,
-                                          exc_tb))
+                                        exc_tb))
     
     def __repr__(self):
-        return "Chain failure: {ftype} at method \"{method}\" in module {mod_filename} (line {lineno}) | {exc_instance!r}; {data}; {details}\n{ext_info}".format(
+        return "Chain failure: {ftype} at method \"{method_name}\" in module {mod_filename} (line {lineno}):\n{ext_info}\n".format(
             ftype=self.exc_name,
-            method=self.method,
+            method_name=self.method_name,
             mod_filename=self.fname,
             lineno=self.line,
-            exc_instance=self.exception,
-            data=self.data_before_failure,
-            details=self.details,
+            # exc_type=self.exc_type,
+            # data=self.data_before_failure,
+            # details=self.details,
             ext_info=self.ext_info
         )
     
     def __str__(self):
-        return "Failure: {}".format(self.exc_name)
+        return "Failure <{}>".format(self.exc_name)
         
 
         # return f"Chain failure: {self.exc_name} at method \"{self.method}\" in module {self.fname} (line {self.line}) | {self.exception!r}; {self.data_before_failure}; {self.details}"
@@ -252,7 +307,7 @@ class Chain:
         if self._compiled is None:
             self._compiled = []
             for h in self.handlers:
-                rec = (h.render_code(), h.topic)
+                rec = (h.render_code(), h.q_topic, h.topic, h.topic_root)
                 log.debug("Compiling: %s; %s", rec[1], rec[0])
                 self._compiled.append(rec)
         return self._compiled
@@ -268,35 +323,54 @@ class Chain:
         :rtype: Any
         """
         # Idea add also iter protocol support (?): .next, ...
-        envelope = Envelope(initial_data)
-        for (method, topic) in self.compiled:
+        envelope = Envelope(initial_data=initial_data)
+        for (method, method_q_topic, method_topic, topic_root) in self.compiled:
+            is_failure = envelope.isfailure
+            active_root = envelope.active_root
+            if topic_root != active_root:
+                continue # Moving along another branch data/failure
             try:
-                data = envelope.getval(topic)
-                prefix = '[F]' if envelope.isfailure else '[S]'
-                if data is None:
+                data_or_failure = envelope.get(active_root, method_topic)
+                
+                if data_or_failure is None:
                     continue # Topic not found
 
-                # log.debug(f"{prefix} Running '{callable_name(method)}'; topic: '{topic}'; envelope: {envelope.state}; getval: {data}")
-                log.debug("%s Running '%s'; topic: '%s'; envelope: %s; getval: %s", 
-                    prefix, callable_name(method), topic, envelope.state, data)
-
+                # Extract failure only for top-level handler:
+                if is_failure and method_topic is None:
+                    failure_rec = envelope.get_failure().copy()
+                    exc_name, failure = failure_rec.popitem()
+                    data_or_failure = failure
+                
                 if middleware:
-                    data = middleware(method, data)
+                    data = middleware(method, data_or_failure)
                 else:
-                    data = method(data)
-                if envelope.isfailure:
-                    envelope.reset_failure()
+                    data = method(data_or_failure)
+
+                if is_failure:
+                    # Extract failure info and clear failure data at the same time:
+                    _, failure = envelope.get_failure().popitem()
                     if data is not None:
-                        envelope.state[Envelope.DATA_ROOT] = data
+                        assert envelope.isfailure == False
+                        topic = failure.topic # get last topic before failure
+                        # envelope.state[Envelope.DATA_ROOT] = data
+                        envelope.set_data(topic, data)
+                    # envelope.reset_failure()
                 else:
-                    envelope.setval(topic, data)
+                    envelope.set_data(method_topic, data)
 
             except Exception as e:
-                data_before_failure = ff.copy(envelope.state[Envelope.DATA_ROOT])
-                failure = Failure(e, data_before_failure, method=callable_name(method), topic=topic)
+                if is_failure:
+                    # Do not allow to raise "nested" exceptions:
+                    raise RuntimeError("Critical error - exception inside error handler: %r" % e)
+                # data_before_failure = ff.copy(envelope.state[Envelope.DATA_ROOT])
+                data_before_failure = ff.copy(envelope.get_data(method_topic))
+                failure = Failure(e, data_before_failure, method_name=callable_name(method), topic=method_topic)
                 envelope.set_failure({e.__class__.__name__: failure})
-                # log.debug(f"[E] Running '{callable_name(method)}'; topic: '{topic}'; envelope: {envelope.state}")
-                log.debug("[E] Running '%s'; topic: '%s'; envelope: %r", callable_name(method), topic, envelope.state)
+
+        if envelope.isfailure:
+            raise RuntimeError(
+                "Critical error - cannot access data because exception: %r" % 
+                envelope.state[envelope.FAILURE_ROOT])
 
         return envelope.get_data()
         
@@ -402,6 +476,7 @@ class Chain:
         """
 
         argtype = type(ex_class_or_name).__name__
+        print("REGISTERING ERROR HANDLER::::", argtype)
         if argtype == 'str':
             keypath = ex_class_or_name
         elif argtype in ('type', 'classobj'):
@@ -426,15 +501,13 @@ class Handler:
     def __init__(self, method, topic = None):
         self.method = method
         self.name = callable_name(method)
+        self.topic = topic
         path = []
         if self.topic_root != Envelope.ROOT:
             path.append(self.topic_root)
-        if topic is not None:
+        if topic:
             path.append(topic)
-        if len(path) > 0:
-            self.topic = "/".join(path)
-        else: 
-            self.topic = self.topic_root
+        self.q_topic = "/".join(path)
 
     def render_code(self):
         return self.method
