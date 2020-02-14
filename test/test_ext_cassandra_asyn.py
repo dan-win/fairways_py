@@ -27,13 +27,14 @@ class CassandraDbTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from fairways.ci import helpers
-        cls.helpers = helpers
-
-        from fairways.io.syn import cassandra
-
+        import asyncio
+        from fairways.io.asyn import cassandra
         import time
         import re
         import os
+
+        cls.helpers = helpers
+        cls.asyncio = asyncio
         cls.cassandra = cassandra
         cls.time = time
         cls.re = re
@@ -57,34 +58,34 @@ class CassandraDbTestCase(unittest.TestCase):
 
             cql = """CREATE keyspace if not exists test_keyspace with replication = {{'class': 'SimpleStrategy', 'replication_factor':3}};"""
             
-            res = db.execute(cql)
+            res = self.helpers.run_asyn(db.execute(cql))
             print("--->", res)
 
             cql = """use test_keyspace;"""
             
-            res = db.execute(cql)
+            res = self.helpers.run_asyn(db.execute(cql))
             print("--->", res)
 
             cql = """CREATE TABLE if not exists test_keyspace.fairways (id int primary key, name varchar);"""
             
-            res = db.execute(cql)
+            res = self.helpers.run_asyn(db.execute(cql))
             print("--->", res)
 
             cql = """insert into test_keyspace.fairways (id, name) values (1, 'My Way');"""
             
-            res = db.execute(cql)
+            res = self.helpers.run_asyn(db.execute(cql))
             print("--->", res)
 
             cql = """select name from test_keyspace.fairways where id=1;"""
             
-            result = db.fetch(cql)
+            result = self.helpers.run_asyn(db.fetch(cql))
             print("--->", result)
 
             cql = """DROP keyspace if exists test_keyspace;"""
             
-            # db.execute(cql)
+            # self.helpers.run_asyn(db.execute(cql))
 
 
-        self.assertEqual(len(result), 1, "More than 1 row returned")
-        self.assertDictEqual(result[0], {'name': 'My Way'}, "Result does not match")
+        self.assertEqual(len(result), 1)
+        self.assertDictEqual(result[0], {'name': 'My Way'})
 

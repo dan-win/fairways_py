@@ -16,6 +16,7 @@ from .base import (SynDataDriver, UriConnMixin)
 
 import logging
 log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 # UriParts = namedtuple('UriParts', 'scheme,user,password,host,port,path,params'.split(','))
@@ -102,16 +103,7 @@ class Cassandra(SynDataDriver, CassandraConnMixin):
         self.engine = cluster
         self.session = session
     
-
-    def fetch(self, cql):
-        """Fetch data from resource
-        
-        :param cql: CQL script to fetch data
-        :type cql: str
-        :return: Result 
-        :rtype: List[Dict]
-        """
-        log.debug("Cassandra: CQL fetch: %s", cql)
+    def _query(self, cql):
         try:
             self._ensure_connection()
             rows = self.session.execute(cql)
@@ -123,20 +115,25 @@ class Cassandra(SynDataDriver, CassandraConnMixin):
             if self.autoclose:
                 self.close()
 
+
+    def fetch(self, cql):
+        """Fetch data from resource
+        
+        :param cql: CQL script to fetch data
+        :type cql: str
+        :return: Result 
+        :rtype: List[Dict]
+        """
+        log.debug("Cassandra: CQL fetch: %s", cql)
+        return self._query(cql)
+
     def change(self, cql):
         """Change data on resource
         
         :param cql: Script to fetch data
         :type cql: str
         """
-        try:
-            self._ensure_connection()
-            self.session.execute(cql)
-        except Exception as e:
-            log.error("DB operation error: %r at %s; %s", e, self.db_name, cql)
-            raise
-        finally:
-            if self.autoclose:
-                self.close()
+        log.debug("Cassandra: CQL change: %s", cql)
+        return self._query(cql)
 
 
