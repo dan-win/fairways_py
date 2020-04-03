@@ -33,6 +33,7 @@ test:py37:
     - pip install -r requirements.txt
     - python -m unittest
 
+
 # test:py38:
 #   image: python:3.8-slim
 #   stage: test
@@ -40,16 +41,20 @@ test:py37:
 #     - pip install -r requirements.txt
 #     - python -m unittest
 
-# deploy_pypi:
-#   image: python:3.6
-#   stage: deploy
-#   script:
-#     - pip install -U twine setuptools
-#     - python setup.py sdist bdist_wheel
-#     - twine upload dist/*.tar.gz
-#     - twine upload dist/*.whl
-#   only:
-#     - /^v\d+\.\d+\.\d+([abc]\d*)?$/  # PEP-440 compliant version (tags)
+# Details about package publishing: https://medium.com/@pypripackages/using-gitlab-pipelines-to-deploy-python-packages-in-production-and-staging-environments-8ab7dc979274
+deploy_pypi:
+  image: python:3.6
+  stage: deploy
+  variables:
+    TWINE_USERNAME: $PRODUCTION_USERNAME
+    TWINE_PASSWORD: $PRODUCTION_PASSWORD
+  script:
+    - pip install -U twine setuptools
+    - python setup.py sdist bdist_wheel
+    - twine upload dist/*.tar.gz
+    - twine upload dist/*.whl
+  only:
+    - /^v\d+\.\d+\.\d+([abc]\d*)?$/  # PEP-440 compliant version (tags)
 
 
 # deploy_docker:
