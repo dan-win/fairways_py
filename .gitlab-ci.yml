@@ -41,20 +41,37 @@ test:py37:
 #     - pip install -r requirements.txt
 #     - python -m unittest
 
+# --repository-url https://test.pypi.org/legacy/
+
+deploy_pypi_staging:
+    image: python:3.6
+    stage: deploy
+    variables:
+      TWINE_USERNAME: $STAGING_USERNAME
+      TWINE_PASSWORD: $STAGING_PASSWORD
+    script:
+      - pip install -U twine setuptools wheel
+      - python setup.py sdist bdist_wheel
+      - twine upload --repository-url $STAGING_PYPI_REPOSITORY_URL dist/*.tar.gz
+      - twine upload --repository-url $STAGING_PYPI_REPOSITORY_URL dist/*.whl
+    except:
+      - tags
+  
 # Details about package publishing: https://medium.com/@pypripackages/using-gitlab-pipelines-to-deploy-python-packages-in-production-and-staging-environments-8ab7dc979274
-deploy_pypi:
+deploy_pypi_production:
   image: python:3.6
   stage: deploy
   variables:
     TWINE_USERNAME: $PRODUCTION_USERNAME
     TWINE_PASSWORD: $PRODUCTION_PASSWORD
   script:
-    - pip install -U twine setuptools
+    - pip install -U twine setuptools wheel
     - python setup.py sdist bdist_wheel
     - twine upload dist/*.tar.gz
     - twine upload dist/*.whl
   only:
-    - /^v\d+\.\d+\.\d+([abc]\d*)?$/  # PEP-440 compliant version (tags)
+    - tags
+    # - /^v\d+\.\d+\.\d+([abc]\d*)?$/  # PEP-440 compliant version (tags)
 
 
 # deploy_docker:
