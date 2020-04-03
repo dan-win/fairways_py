@@ -3,7 +3,10 @@ from setuptools import setup, find_packages
 requirements = ["python>=3.3"]
 
 setup(name='fairways',
-    use_scm_version=True,
+    use_scm_version={
+        'version_scheme': 'python-simplified-semver',
+        'local_scheme': 'no-local-version',
+    },
     setup_requires=['setuptools_scm'],
     #   version='0.9.10',
     description='Toolset to organize tasks',

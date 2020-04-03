@@ -1,9 +1,14 @@
 [![pipeline status](https://gitlab.com/danwin/fairways_py/badges/master/pipeline.svg)](https://gitlab.com/danwin/fairways_py/commits/master)
 
-#Documents#
+## Installation ##
+```$ pip install fairways```
+## Documents ##
 https://fairways-py.readthedocs.io/en/latest/
 
-#License#
+## Warning ##
+Some modules are proof-of-concept. Avoid to use this package in production without comprehensive test suite for your app.
+
+## License ##
 
 Licensed under either of the following, at your option:
 
