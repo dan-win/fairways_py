@@ -1,5 +1,7 @@
 [![pipeline status](https://gitlab.com/danwin/fairways_py/badges/master/pipeline.svg)](https://gitlab.com/danwin/fairways_py/commits/master)
 
+[![Documentation Status](https://readthedocs.org/projects/fairways-py/badge/?version=latest)](https://fairways-py.readthedocs.io/en/latest/?badge=latest)
+
 ## Installation ##
 ```$ pip install fairways```
 ## Documents ##

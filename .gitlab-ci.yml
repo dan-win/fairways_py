@@ -52,8 +52,7 @@ deploy_pypi_staging:
     script:
       - pip install -U twine setuptools wheel
       - python setup.py sdist bdist_wheel
-      - twine upload --repository-url $STAGING_PYPI_REPOSITORY_URL dist/*.tar.gz
-      - twine upload --repository-url $STAGING_PYPI_REPOSITORY_URL dist/*.whl
+      - twine upload --repository-url $STAGING_PYPI_REPOSITORY_URL dist/*
     except:
       - tags
   
@@ -67,8 +66,7 @@ deploy_pypi_production:
   script:
     - pip install -U twine setuptools wheel
     - python setup.py sdist bdist_wheel
-    - twine upload dist/*.tar.gz
-    - twine upload dist/*.whl
+    - twine upload dist/*
   only:
     - tags
     # - /^v\d+\.\d+\.\d+([abc]\d*)?$/  # PEP-440 compliant version (tags)
