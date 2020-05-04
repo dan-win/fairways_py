@@ -123,6 +123,8 @@ class Transmitter(Channel):
 @register_decorator
 class QA(Channel):
     mark_name = "qa"
+    description = "Run test"
+    once_per_module = False
 
 
 @register_decorator

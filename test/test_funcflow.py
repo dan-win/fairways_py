@@ -15,6 +15,7 @@ class FuncFlowTestCase(unittest.TestCase):
     def setUpClass(cls):
         from fairways import funcflow
         cls.FuncFlow = funcflow.FuncFlow
+        cls.Lazy = funcflow.Lazy
 
     @classmethod
     def tearDownClass(cls):
@@ -326,6 +327,18 @@ class FuncFlowTestCase(unittest.TestCase):
         result = ff.chain([1,2]).sort_by(lambda v: -v).map(str).apply(",".join).value
 
         self.assertEqual(result, '2,1')
+    
+    def test_lazy(self):
+        """Test lazy chain approach
+        """
+        Lazy = self.Lazy
+
+        lazy = Lazy().map(lambda x: '%s:done' %x).reduce(lambda a, b: ",".join([a,b]), "Start:")
+
+        result = lazy([1,2,3])
+
+        self.assertEqual(result, 'Start:,1:done,2:done,3:done')
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

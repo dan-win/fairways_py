@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from .funcflow import FuncFlow as ff
 
-def get_nested(d, path, delimiter="/"):
+def get_nested(d, path="", delimiter="/"):
     """
     Address nested dicts via combined path
     """
@@ -18,7 +18,7 @@ def get_nested(d, path, delimiter="/"):
     # print(">>>>>>>>>>>>>> splitted", tags)
     return item_by_tag(d, tags)
 
-def get_nested_default(d, path, delimiter="/", default=None):
+def get_nested_default(d, path="", delimiter="/", default=None):
     """
     Address nested dicts via combined path
     """
@@ -61,6 +61,19 @@ def rows2dict(r, key_attr=None, value_attr=None):
     """
     return ff.reduce(r, lambda memo, r: ff.extend(memo, {r[key_attr]: r[value_attr]}), {})
 
+
+def add_path_to_local_repo(package_dir):
+    """Import package from local repository in "editable" mode without pip install
+
+    :param package_dir: Absolute or relative path to a project root dir of a local repository (e.g., something like ./../../fairways_py" for "fairways" should work also)
+    :type package_dir: str
+    """
+    # "Editable package" without installation
+    import os, sys
+    lib_path = os.path.join(os.path.dirname(__file__), package_dir)
+    lib_path = os.path.abspath(lib_path)
+    print('Setting path to local repository:', lib_path)
+    sys.path.append(lib_path)
 
 def ColoredFormatterFactory(**kwargs):
     format_template = kwargs.pop("format_template")

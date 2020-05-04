@@ -42,9 +42,7 @@ def check_pub_result(result):
     print(f"Step after publish: {type(result)}")
     return result
 
-def handle_error(err_info):
-    # failure = err_info
-    extype, failure = err_info.popitem()
+def handle_error(failure):
     print("ERROR: Something wrong!", repr(failure))
 
 

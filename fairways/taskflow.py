@@ -46,9 +46,9 @@ from fairways.funcflow import FuncFlow as ff
 from fairways.helpers import (get_nested_default, get_parent, get_lastkey)
 from fairways.decorators import typecast
 
-from fairways import log
-# import logging
-log = log.getLogger()
+# from fairways import log
+import logging as log
+log = log.getLogger(__name__)
 
 
 class Envelope(typecast.FromTypeMixin):
@@ -296,6 +296,9 @@ class Chain:
     
     # def __str__(self):
     #     children = [f.__name__ for (f, topic) in self.fom]
+    @property
+    def __name__(self):
+        return "Chain %s" % self.name
     
     @property
     def compiled(self):
@@ -426,6 +429,17 @@ class Chain:
         h = HandlerThen(method, topic=keypath)
         self.add_handler(h)
         return self
+
+    def map(self, method):
+        def mapper(data):
+            return ff.map(data, method)
+        return self.then(mapper)
+
+    def map_on(self, keypath, method):
+        def mapper(data):
+            return ff.map(data, method)
+        return self.on(keypath, mapper)
+
 
     def catch(self, method):
         """Add global interceptor to catch Exception

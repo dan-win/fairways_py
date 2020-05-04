@@ -75,6 +75,11 @@ class TaskFlowTestCase(unittest.TestCase):
         result = chain(arg)
 
         self.assertEqual(result, "abcd")
+    
+    @unittest.skip("not ready")
+    def test_handler_functools_partial(self):
+        """Taskflow should resolve partial name when partial traced in flow
+        """
 
     @unittest.skip("not ready")
     def test_all(self):

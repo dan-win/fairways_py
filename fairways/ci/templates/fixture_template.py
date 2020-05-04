@@ -71,3 +71,31 @@ class FixtureTestTemplate(unittest.TestCase):
         
         return result
 
+    def get_response_with_request_fixture(self, fixture_dict=None, middleware=None, test_funcname=None):
+        """
+        Call this method to run test without mock db
+        """
+        ff = self.ff
+        decorators = self.decorators
+
+        entry = ff.filter(QA.items(), lambda r: r.module == self.modname)
+
+        if len(entry) > 1: 
+            if test_funcname is None:
+                raise TypeError("Your source module contains more than one test, you should provide 'test_funcname' to select exact test")
+            entry = ff.find(entry, lambda r: r.subject.__name__ == test_funcname)
+        else:
+            entry = entry[0]
+
+        self.log.debug("ENTRYPOINT: %s", entry)
+
+        # module_conn = decorators.connection.define.find_module_entity(self.modname)
+        # fixture_name = f"{self.subject_module}_fixture_queries_set".upper()
+        fixture_dict = fixture_dict or self.fixture
+        # fixture_queriesset = QueriesSet.from_fixtures_dict(fixture_name, **fixture_dict)
+
+        # with unittest.mock.patch.object(module_conn, "subject", fixture_queriesset):
+        #     ctx = {}
+        result = entry.handler(fixture_dict, middleware=middleware)
+        
+        return result

@@ -1,15 +1,31 @@
 # Compiled python modules.
 *.pyc
-
-# Setuptools distribution folder.
-dist/*
-
-# Python egg metadata, regenerated from source files by setuptools.
-*.egg-info/*
-
 __pycache__/
-build/*
+
+# pyenv
 .python-version
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+.env
 
 # draft (custom) prefix
 -*

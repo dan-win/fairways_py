@@ -7,10 +7,44 @@ Despite that, a lot of methods have different naming and behaviour.
 
 import copy
 import collections
+from functools import (partial as _partial, update_wrapper as _update_wrapper)
+
+_LazyRegistry = {}
+
+# def add_lazy(f, *args, **kwargs):
+#     lazy = functools.partial,(f, *args, **kwargs)
+#     setattr(_LazyRegistry, lazy)
+#     return f
+
+class add_lazy:
+    """Decorator to register "lazy" option for method.
+    
+    :param mapping_lambda: Proxy (invocation protocol) which places "frozen" and "deferred" values in desired places. Two first (function and data) are pre-defined for dynamic values, remaining values are intended for frozen ones
+    :type mapping_lambda: callable
+
+    :return: Original function
+    :rtype: callable
+    """
+    def __init__(self, mapping_lambda):
+        """Constructor        
+        """
+        self.mapping_lambda = mapping_lambda
+
+    def __call__(self, f):
+        def lazy(*args):
+            def deferred_f(data):
+                return self.mapping_lambda(f, data, *args)
+            return deferred_f
+        _update_wrapper(lazy, f) 
+        _LazyRegistry[f.__name__] = lazy
+        return f
+
+
 
 class FuncFlow(object):
     """ This class contains functions to operate with mappings and iterables.
     """
+    
 
     @staticmethod
     def deep_extend(*args):
@@ -24,7 +58,7 @@ class FuncFlow(object):
         :rtype: Mapping
 
         >>> FuncFlow.deep_extend({}, {'name': 'moe'}, {'age': 50}, {'name': 'new'}, {'nested':{'some': 1}})
-        {'name': 'new', 'age': 50, {'nested':{'some': 1}}}
+        {'name': 'new', 'age': 50, 'nested': {'some': 1}}
         """
         def clone_obj(item):
             if isinstance(item, collections.abc.Mapping):
@@ -69,13 +103,16 @@ class FuncFlow(object):
         :return: List of unique values. Note that values can be out of order
         :rtype: list
 
-        >>> FuncFlow.uniq([1, 2, 1, 4, 1, 3])
-        [1, 2, 4, 3]
+        >>> a = FuncFlow.uniq([1, 2, 1, 4, 1, 3])
+        >>> a.sort() # Note: order not guaranteed!
+        >>> a
+        [1, 2, 3, 4]
         """
         if iterable is None: return None
         return list(set(list(iterable)))
 
     @staticmethod
+    @add_lazy(lambda f, iterable, iterfunc: f(iterable, iterfunc))
     def filter(iterable, iterfunc):
         """Filter iterable members with a rule defined as a function
         
@@ -87,12 +124,13 @@ class FuncFlow(object):
         :rtype: list
 
         >>> FuncFlow.filter([1, 2, 3, 4, 5, 6], lambda v: v % 2 == 0)
-        [2,4,6]
+        [2, 4, 6]
         """
         if iterable is None: return None
         return [item for item in iterable if iterfunc(item)]
-    
+
     @staticmethod
+    @add_lazy(lambda f, iterable, iterfunc, memo: f(iterable, iterfunc, memo))
     def reduce(iterable, iterfunc, memo):
         """Compute single result from iterable using supplied function
         
@@ -149,6 +187,7 @@ class FuncFlow(object):
         return FuncFlow.deep_extend({}, *args)
 
     @staticmethod
+    @add_lazy(lambda f, iterable, *keys: f(iterable, *keys))
     def omit(data, *keys):
         """Build dict from the source mapping, without specified keys
         
@@ -165,6 +204,7 @@ class FuncFlow(object):
         return {k: v for k, v in data.items() if k not in keys}
 
     @staticmethod
+    @add_lazy(lambda f, iterable, *keys: f(iterable, *keys))
     def pick(data, *keys):
         """Build dict from the source mapping, with specified keys only.
         This is opposite operation for omit.
@@ -201,6 +241,7 @@ class FuncFlow(object):
         return value in iterable
     
     @staticmethod
+    @add_lazy(lambda f, iterable, iterfunc: f(iterable, iterfunc))
     def count_by(iterable, iterfunc):
         """Count items with grouping in accordance with rules
         
@@ -221,6 +262,7 @@ class FuncFlow(object):
         return result
 
     @staticmethod
+    @add_lazy(lambda f, iterable, iterfunc: f(iterable, iterfunc))
     def each(iterable, iterfunc):
         """Apply iterable to each item.
         Note that this function returns no result!
@@ -239,6 +281,7 @@ class FuncFlow(object):
                 iterfunc(value, i, iterable)
 
     @staticmethod
+    @add_lazy(lambda f, iterable, iterfunc: f(iterable, iterfunc))
     def every(iterable, iterfunc):
         """Returns true if all of the values in the list pass the predicate truth test
         
@@ -258,6 +301,7 @@ class FuncFlow(object):
         return FuncFlow.reduce(iterable, lambda memo, v: memo and bool(iterfunc(v)), True)
 
     @staticmethod
+    @add_lazy(lambda f, iterable, iterfunc: f(iterable, iterfunc))
     def find(iterable, iterfunc):
         """Looks through each value in the list, returning the first one that passes a truth test (predicate), or None if no value passes the test.
         
@@ -311,7 +355,8 @@ class FuncFlow(object):
         return None
 
     @staticmethod
-    def map(iterable, iterfunc):
+    @add_lazy(lambda f, iterable, iterfunc, *args: f(iterable, iterfunc))
+    def map(iterable, iterfunc=None):
         """Build new iterable where each item modified by function providen
         
         :param iterable: Source iterable
@@ -322,14 +367,19 @@ class FuncFlow(object):
         :rtype: list
 
         >>> FuncFlow.map([1, 2, 3, 4, 5, 6], lambda num: num * 2)
-        {"a":2, "b":4, "c":6, "d":8, "e":10, "f":12}
+        [2, 4, 6, 8, 10, 12]
+        >>> FuncFlow.map({"a":1, "b":2, "c":3, "d":4, "e":5, "f":6}, lambda num, k: num * 2)
+        {'a': 2, 'b': 4, 'c': 6, 'd': 8, 'e': 10, 'f': 12}
         """
         if iterable is None: return None
         if isinstance(iterable, dict):
             return {k:iterfunc(v, k) for k, v in iterable.items()}
         return [iterfunc(item) for item in iterable]
+    # lazy.map = lambda iterfunc: lambda iterable: map(iterable, iterfunc) 
+    # lazy.map = lambda iterfunc: _partial(map, iterfunc=iterfunc) 
 
     @staticmethod
+    @add_lazy(lambda f, iterable, iteratee: f(iterable, iteratee))
     def group_by(iterable, iteratee):
         """Splits a collection into sets, grouped by the result of running each value through iteratee. If iteratee is a string instead of a function, groups by the property named by iteratee on each of the values
         
@@ -362,6 +412,7 @@ class FuncFlow(object):
         return FuncFlow.reduce(iterable, grouper, {})
 
     @staticmethod
+    @add_lazy(lambda f, iterable, iteratee: f(iterable, iteratee))
     def index_by(iterable, iteratee):
         """Given an iterable, and an iteratee function that returns a key for each element (or a property name), returns a dict with a key of each item. 
         Just like group_by, but for when you know your keys are unique.
@@ -392,6 +443,7 @@ class FuncFlow(object):
         return FuncFlow.reduce(iterable, grouper, {})
 
     @staticmethod
+    @add_lazy(lambda f, iterable, propname: f(iterable, propname))
     def pluck(iterable, propname):
         """Enumerate unique values of key for all items in iterable
         
@@ -405,6 +457,7 @@ class FuncFlow(object):
         return FuncFlow.uniq(FuncFlow.map(iterable, lambda v: v[propname]))
     
     @staticmethod
+    @add_lazy(lambda f, iterable, iterfunc: f(iterable, iterfunc))
     def sort_by(iterable, iterfunc):
         """Sort items using function and return new list without modifications in a source one
         
@@ -455,6 +508,7 @@ class FuncFlow(object):
         return copy.deepcopy(iterable)
 
     @staticmethod
+    @add_lazy(lambda f, iterable, iterfunc: f(iterable, iterfunc))
     def apply(object, func):
         """Apply function to entire object at once.
         Wrapper for chaining
@@ -467,6 +521,37 @@ class FuncFlow(object):
         :rtype: Any
         """
         return func(object)
+
+
+class Lazy(object):
+    """Chainable object which allow to return "lazy" or "frozen" sequence of operations for deferred invocation.
+    """
+
+    def __init__(self):
+        """Constructor method
+        """
+        self.queue = []
+
+    @property
+    def __name__(self):
+        return "Lazy flow"
+
+    def __getattribute__(self, name):
+        lazy = _LazyRegistry.get(name, None)
+        if lazy is not None:
+            # log.debug("lazy found: %s", lazy)
+            def wrapper(*args):
+                # log.debug("wrapping: %s; %s; %s", lazy, name, args)
+                closure = lazy(*args)
+                self.queue.append(closure)
+                return self
+            return wrapper
+        return object.__getattribute__(self, name)
+
+    def __call__(self, data):
+        for processor in self.queue:
+            data = processor(data)
+        return data
 
 class Chain(object):
     """ Chainable object which allow to return new instance of Chain after most operations of FuncFlow.
@@ -535,3 +620,6 @@ def _align_type(data):
         return list(data)
 
 
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
